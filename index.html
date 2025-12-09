@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V13 (Total Geral + Fix Datas)</title>
+    <title>Dashboard Desperdícios - V14 (Fix Dia Atual)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -26,7 +26,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 13: Comparativo de Gasto Total por Loja & Correção de Datas.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 14: Ignora dia atual (em andamento) nos dias faltantes.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -91,6 +91,7 @@
                         <p class="text-xs text-amber-600 uppercase font-bold flex items-center">
                             <i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes
                         </p>
+                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual desconsiderado</span>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
                         <p class="text-center italic text-slate-400 mt-4">Processando datas...</p>
@@ -153,11 +154,7 @@
             "José": ["PT003", "PT005", "PT011", "PT020", "PT022", "PT024", "PT026", "PT028", "PT030"]
         };
         const amHexColors = {
-            "Sulamita": "#7c3aed", // Violeta
-            "Marcelo": "#2563eb",  // Azul
-            "Monique": "#db2777",  // Rosa
-            "José": "#ea580c",     // Laranja
-            "Outros": "#64748b"    // Slate
+            "Sulamita": "#7c3aed", "Marcelo": "#2563eb", "Monique": "#db2777", "José": "#ea580c", "Outros": "#64748b"
         };
         const amTailwindColors = {
             "Sulamita": "border-violet-500 text-violet-700 bg-violet-50",
@@ -167,11 +164,9 @@
             "Outros": "border-slate-400 text-slate-600 bg-slate-100"
         };
 
-        // VARIÁVEIS GLOBAIS
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {};
         let paretoChart = null, trendChart = null, storeChart = null;
 
-        // UPLOAD
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
@@ -198,7 +193,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // INICIALIZAÇÃO
         function identifyAM(store) {
             for (const [mgr, codes] of Object.entries(amConfig)) if (codes.some(c => store.toUpperCase().includes(c))) return mgr;
             return "Outros";
@@ -251,18 +245,15 @@
             runAudit(rawData.filter(r => selected.includes(r['Buyer'])), selected);
         }
 
-        // DATA PARSING SEGURO
         function parseDate(val) {
             if (val instanceof Date) return val;
             if (typeof val === 'string' && val.split(/[\/\-]/).length === 3) {
                 const p = val.trim().split(/[\/\-]/);
-                // Assume DD/MM/YYYY
                 return new Date(p[2], p[1]-1, p[0]);
             }
             return null;
         }
 
-        // LÓGICA PRINCIPAL (AUDITORIA)
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
@@ -270,25 +261,21 @@
             
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
             let typeCount = {}, trendData = {};
-            let storeTotalWaste = {}; // Acumulador de TODO o desperdício (certo + errado)
+            let storeTotalWaste = {}; 
             let errorRows = [];
-            let allValidDates = []; // Para cálculo correto de dias faltantes
+            let allValidDates = [];
 
-            // 1. Iterar sobre TODOS os dados filtrados
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
                 
-                // Salvar data para análise de faltas (Correção V13)
                 if (date) allValidDates.push(date);
 
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
                 
-                // Acumula total GERAL por loja (Correção V13)
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
-                // Checagem de Erros
                 const name = String(row['Item name']||"").trim();
                 const type = String(row['Item type']||"").trim();
                 const desc = String(row['Description']||"").trim();
@@ -329,7 +316,6 @@
                 }
             });
 
-            // 2. Renderizar Tabela (Só erros)
             errorRows.sort((a,b) => (a.date && b.date) ? a.date - b.date : 0);
             const frag = document.createDocumentFragment();
             errorRows.forEach(r => {
@@ -347,14 +333,11 @@
             });
             tbody.appendChild(frag);
 
-            // 3. Atualizar Header e KPIs
             document.getElementById('total-errors').innerText = totalErrCount;
             document.getElementById('error-value-subtext').innerText = "Custo do Erro: € " + totalErrVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
-            // 4. Análise de Datas (Baseado em TODAS as linhas, não só erros)
-            // Define o período do relatório com base nas datas encontradas
             if (allValidDates.length > 0) {
                 allValidDates.sort((a,b) => a-b);
                 const minDate = allValidDates[0];
@@ -369,32 +352,30 @@
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas válidas.</p>';
             }
 
-            // 5. Gráficos
             updateCharts(typeCount, trendData, storeTotalWaste);
         }
 
-        // LÓGICA CORRIGIDA DE DIAS FALTANTES
         function checkMissingDates(sortedAllDates, activeStores) {
             const min = sortedAllDates[0];
             const max = sortedAllDates[sortedAllDates.length-1];
             
-            // Mapear dias presentes por loja
+            // Pega a data de hoje para comparação (sem horas)
+            const today = new Date();
+            const todayISO = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+
             const storePresentDays = {};
             activeStores.forEach(s => storePresentDays[s] = new Set());
             
-            // Percorre o array original de datas já limpas
-            // Nota: Para precisão perfeita, deveríamos re-varrer rawData com o filtro, 
-            // mas usar sortedAllDates (que veio do loop principal) já é muito melhor que apenas erros.
-            // Para garantir mapeamento correto Loja->Data, precisamos que sortedAllDates mantenha vínculo com a loja.
-            // Como sortedAllDates é só array de datas, vamos refazer rapidinho o set olhando rawData filtrado
-            // Essa é a forma mais segura:
+            // Re-filtra para garantir consistência
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             const activeData = rawData.filter(r => checkboxes.includes(r['Buyer']));
             
             activeData.forEach(r => {
                 const d = parseDate(r['Date']);
                 if(d && r['Buyer']) {
-                    storePresentDays[r['Buyer']].add(d.toISOString().split('T')[0]);
+                    // Formata a data presente no arquivo como YYYY-MM-DD local
+                    const dISO = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    storePresentDays[r['Buyer']].add(dISO);
                 }
             });
 
@@ -404,11 +385,15 @@
 
             activeStores.forEach(store => {
                 let missing = [];
-                // Itera do dia min ao max
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
-                    const iso = d.toISOString().split('T')[0];
+                    // Formata a data do loop como YYYY-MM-DD local
+                    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    
+                    // SE for hoje, pula a verificação
+                    if (iso === todayISO) continue;
+
                     if(!storePresentDays[store].has(iso)) {
-                        missing.push(d.toLocaleDateString('pt-PT').slice(0,5)); // dd/mm
+                        missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                     }
                 }
 
@@ -454,7 +439,7 @@
 
             // CHART LOJAS (TOTAL GERAL)
             if(storeChart) storeChart.destroy();
-            const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]); // Ordena pelo total gasto
+            const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
 
             storeChart = new Chart(document.getElementById('storeChart'), {
