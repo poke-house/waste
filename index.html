@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios V14 09.12.25 )</title>
+    <title>Dashboard Desperdícios - V15 (Drill-down Lojas)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -18,15 +18,64 @@
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .loading { pointer-events: none; opacity: 0.6; }
+        
+        /* Modal Animation */
+        .modal { transition: opacity 0.25s ease; }
+        body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800">
+
+    <div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
+        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeModal()"></div>
+        
+        <div class="modal-container bg-white w-11/12 md:max-w-3xl mx-auto rounded shadow-lg z-50 overflow-y-auto max-h-[90vh]">
+            
+            <div class="modal-content py-4 text-left px-6">
+                <div class="flex justify-between items-center pb-3 border-b">
+                    <div>
+                        <p class="text-2xl font-bold text-slate-800" id="modal-store-title">Loja</p>
+                        <p class="text-sm text-slate-500">Detalhamento de desperdício (Maior valor para o menor)</p>
+                    </div>
+                    <div class="cursor-pointer z-50" onclick="closeModal()">
+                        <i class="fas fa-times text-xl text-slate-500 hover:text-slate-800"></i>
+                    </div>
+                </div>
+
+                <div class="my-5 overflow-x-auto custom-scroll">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50">
+                            <tr>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Data</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Item</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Tipo</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Descrição</th>
+                                <th class="p-3 text-xs font-bold text-slate-500 uppercase text-right">Valor (€)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="modal-table-body" class="text-sm text-slate-700">
+                            </tbody>
+                        <tfoot class="bg-slate-50 font-bold border-t border-slate-200">
+                            <tr>
+                                <td colspan="4" class="p-3 text-right">TOTAL:</td>
+                                <td class="p-3 text-right" id="modal-total-value">€ 0,00</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
+
+                <div class="flex justify-end pt-2">
+                    <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 p-3 rounded-lg text-slate-700 hover:bg-slate-300 font-medium">Fechar</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <div class="max-w-[98%] mx-auto">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 14: Ignora dia atual (em andamento) nos dias faltantes.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 15: Drill-down interativo por loja.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -101,8 +150,11 @@
 
             <div class="bg-white p-5 rounded-xl shadow-sm">
                 <h4 class="font-bold text-slate-700 mb-1 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€) por Loja</h4>
-                <p class="text-xs text-slate-400 mb-4">Soma de todo o valor lançado na planilha (Corretos + Errados). As cores indicam o Area Manager.</p>
-                <div class="h-96"><canvas id="storeChart"></canvas></div>
+                <p class="text-xs text-slate-400 mb-4 flex items-center">
+                    <span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                    Clique em uma barra para ver o detalhe dos produtos (Maior gasto para menor).
+                </p>
+                <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
             </div>
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -164,9 +216,13 @@
             "Outros": "border-slate-400 text-slate-600 bg-slate-100"
         };
 
+        // VARIÁVEIS GLOBAIS
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {};
+        // Novo objeto para guardar os detalhes por loja
+        let storeDetailsMap = {}; 
         let paretoChart = null, trendChart = null, storeChart = null;
 
+        // UPLOAD
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
@@ -193,6 +249,7 @@
             reader.readAsArrayBuffer(file);
         }
 
+        // INICIALIZAÇÃO
         function identifyAM(store) {
             for (const [mgr, codes] of Object.entries(amConfig)) if (codes.some(c => store.toUpperCase().includes(c))) return mgr;
             return "Outros";
@@ -254,10 +311,12 @@
             return null;
         }
 
+        // LÓGICA PRINCIPAL (AUDITORIA)
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             processedErrors = [];
+            storeDetailsMap = {}; // Reset mapa de detalhes
             
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
             let typeCount = {}, trendData = {};
@@ -268,21 +327,31 @@
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
-                
                 if (date) allValidDates.push(date);
 
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
                 
+                // Acumula total GERAL por loja
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
+                // --- AGREGAR DETALHES PARA O MODAL ---
+                if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
                 const name = String(row['Item name']||"").trim();
                 const type = String(row['Item type']||"").trim();
                 const desc = String(row['Description']||"").trim();
                 
+                storeDetailsMap[buyer].push({
+                    date: date ? date.toLocaleDateString('pt-PT') : "-",
+                    name: name,
+                    type: type,
+                    desc: desc,
+                    val: val
+                });
+                // -------------------------------------
+
                 let errs = [];
                 if(name.toUpperCase().includes("CPK")) errs.push("Nome contém 'CPK'");
-                
                 const validTypes = ["purchase", "sub-recipe", "inventory item"];
                 if(!validTypes.includes(type.toLowerCase())) {
                     if(type.toLowerCase() === "menu item") errs.push("MENU ITEM deve ser Inventory Item ou Purchase");
@@ -301,7 +370,6 @@
                 if(errs.length > 0) {
                     totalErrCount++;
                     totalErrVal += val;
-                    
                     const dStr = date ? date.toLocaleDateString('pt-PT') : "-";
                     const trendKey = date ? date.toISOString().split('T')[0] : 'N/A';
                     trendData[trendKey] = (trendData[trendKey] || 0) + 1;
@@ -310,7 +378,6 @@
                         const k = e.startsWith("Tipo Inválido") ? "Tipo Inválido" : e;
                         typeCount[k] = (typeCount[k]||0) + 1;
                     });
-
                     errorRows.push({ dStr, date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
                     processedErrors.push({ Data: dStr, Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
                 }
@@ -344,7 +411,6 @@
                 const maxDate = allValidDates[allValidDates.length-1];
                 document.getElementById('period-start').innerText = minDate.toLocaleDateString('pt-PT');
                 document.getElementById('period-end').innerText = maxDate.toLocaleDateString('pt-PT');
-                
                 checkMissingDates(allValidDates, activeStores);
             } else {
                 document.getElementById('period-start').innerText = "--";
@@ -359,21 +425,18 @@
             const min = sortedAllDates[0];
             const max = sortedAllDates[sortedAllDates.length-1];
             
-            // Pega a data de hoje para comparação (sem horas)
             const today = new Date();
             const todayISO = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
 
             const storePresentDays = {};
             activeStores.forEach(s => storePresentDays[s] = new Set());
             
-            // Re-filtra para garantir consistência
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             const activeData = rawData.filter(r => checkboxes.includes(r['Buyer']));
             
             activeData.forEach(r => {
                 const d = parseDate(r['Date']);
                 if(d && r['Buyer']) {
-                    // Formata a data presente no arquivo como YYYY-MM-DD local
                     const dISO = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
                     storePresentDays[r['Buyer']].add(dISO);
                 }
@@ -386,34 +449,25 @@
             activeStores.forEach(store => {
                 let missing = [];
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
-                    // Formata a data do loop como YYYY-MM-DD local
                     const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-                    
-                    // SE for hoje, pula a verificação
                     if (iso === todayISO) continue;
 
                     if(!storePresentDays[store].has(iso)) {
                         missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                     }
                 }
-
                 if(missing.length > 0) {
                     hasMissing = true;
                     const txt = missing.length > 6 ? `${missing.slice(0,6).join(", ")}... (+${missing.length-6})` : missing.join(", ");
-                    log.innerHTML += `
-                        <div class="mb-1 border-b border-amber-200 pb-1 last:border-0">
-                            <strong class="text-amber-800 text-xs">${store}</strong>: <span class="text-xs text-amber-700">${txt}</span>
-                        </div>`;
+                    log.innerHTML += `<div class="mb-1 border-b border-amber-200 pb-1 last:border-0"><strong class="text-amber-800 text-xs">${store}</strong>: <span class="text-xs text-amber-700">${txt}</span></div>`;
                 }
             });
-
             if(!hasMissing) {
                 log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
             }
         }
 
         function updateCharts(types, trends, totalWaste) {
-            // PARETO
             if(paretoChart) paretoChart.destroy();
             const sortedTypes = Object.entries(types).sort((a,b) => b[1]-a[1]);
             paretoChart = new Chart(document.getElementById('paretoChart'), {
@@ -425,7 +479,6 @@
                 options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
             });
 
-            // TENDÊNCIA
             if(trendChart) trendChart.destroy();
             const sortedDates = Object.keys(trends).sort();
             trendChart = new Chart(document.getElementById('trendChart'), {
@@ -437,7 +490,6 @@
                 options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
             });
 
-            // CHART LOJAS (TOTAL GERAL)
             if(storeChart) storeChart.destroy();
             const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
@@ -468,11 +520,71 @@
                                 }
                             }
                         }
+                    },
+                    // --- EVENTO DE CLIQUE IMPLEMENTADO AQUI ---
+                    onClick: (evt, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const index = activeElements[0].index;
+                            const storeName = sortedStores[index][0];
+                            openModal(storeName);
+                        }
+                    },
+                    onHover: (event, chartElement) => {
+                        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
                     }
                 }
             });
         }
+
+        // --- FUNÇÕES DO MODAL ---
+        function openModal(storeName) {
+            const modal = document.getElementById('details-modal');
+            const title = document.getElementById('modal-store-title');
+            const tbody = document.getElementById('modal-table-body');
+            const totalDisplay = document.getElementById('modal-total-value');
+            
+            title.innerText = storeName;
+            tbody.innerHTML = '';
+            
+            // Pega itens da loja e ordena por VALOR decrescente
+            const items = storeDetailsMap[storeName] || [];
+            items.sort((a, b) => b.val - a.val);
+
+            let total = 0;
+            const frag = document.createDocumentFragment();
+
+            items.forEach(item => {
+                total += item.val;
+                const tr = document.createElement('tr');
+                tr.className = "border-b border-slate-100 hover:bg-slate-50";
+                tr.innerHTML = `
+                    <td class="p-3 font-mono text-slate-500">${item.date}</td>
+                    <td class="p-3 font-medium text-slate-700">${item.name}</td>
+                    <td class="p-3 text-slate-500 text-xs uppercase">${item.type}</td>
+                    <td class="p-3 text-slate-500 text-xs">${item.desc}</td>
+                    <td class="p-3 font-mono text-slate-700 text-right">€ ${item.val.toFixed(2)}</td>
+                `;
+                frag.appendChild(tr);
+            });
+
+            tbody.appendChild(frag);
+            totalDisplay.innerText = "€ " + total.toLocaleString('pt-PT', {minimumFractionDigits: 2});
+            
+            // Mostrar modal
+            modal.classList.remove('opacity-0', 'pointer-events-none');
+            document.body.classList.add('modal-active');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('details-modal');
+            modal.classList.add('opacity-0', 'pointer-events-none');
+            document.body.classList.remove('modal-active');
+        }
+
+        // Fechar com ESC
+        document.onkeydown = function(evt) {
+            if (evt.key === "Escape") closeModal();
+        };
     </script>
 </body>
 </html>
-
