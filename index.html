@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V15 (Drill-down Lojas)</title>
+    <title>Dashboard Desperdícios - V16 (Drill-down Gráfico Completo)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -27,45 +27,30 @@
 <body class="p-4 md:p-8 text-slate-800">
 
     <div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
-        <div class="modal-overlay absolute w-full h-full bg-gray-900 opacity-50" onclick="closeModal()"></div>
+        <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div>
         
-        <div class="modal-container bg-white w-11/12 md:max-w-3xl mx-auto rounded shadow-lg z-50 overflow-y-auto max-h-[90vh]">
+        <div class="modal-container bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]">
             
-            <div class="modal-content py-4 text-left px-6">
-                <div class="flex justify-between items-center pb-3 border-b">
-                    <div>
-                        <p class="text-2xl font-bold text-slate-800" id="modal-store-title">Loja</p>
-                        <p class="text-sm text-slate-500">Detalhamento de desperdício (Maior valor para o menor)</p>
-                    </div>
-                    <div class="cursor-pointer z-50" onclick="closeModal()">
-                        <i class="fas fa-times text-xl text-slate-500 hover:text-slate-800"></i>
+            <div class="py-4 px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+                <div>
+                    <div class="flex items-center gap-3">
+                        <button id="btn-back-level" onclick="backToStoreLevel()" class="hidden bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1 rounded-md text-sm shadow-sm transition">
+                            <i class="fas fa-arrow-left mr-1"></i> Voltar
+                        </button>
+                        <div>
+                            <p class="text-2xl font-bold text-slate-800" id="modal-title">Loja</p>
+                            <p class="text-sm text-slate-500" id="modal-subtitle">Análise detalhada</p>
+                        </div>
                     </div>
                 </div>
-
-                <div class="my-5 overflow-x-auto custom-scroll">
-                    <table class="w-full text-left border-collapse">
-                        <thead class="bg-slate-50">
-                            <tr>
-                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Data</th>
-                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Item</th>
-                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Tipo</th>
-                                <th class="p-3 text-xs font-bold text-slate-500 uppercase">Descrição</th>
-                                <th class="p-3 text-xs font-bold text-slate-500 uppercase text-right">Valor (€)</th>
-                            </tr>
-                        </thead>
-                        <tbody id="modal-table-body" class="text-sm text-slate-700">
-                            </tbody>
-                        <tfoot class="bg-slate-50 font-bold border-t border-slate-200">
-                            <tr>
-                                <td colspan="4" class="p-3 text-right">TOTAL:</td>
-                                <td class="p-3 text-right" id="modal-total-value">€ 0,00</td>
-                            </tr>
-                        </tfoot>
-                    </table>
+                <div class="cursor-pointer bg-slate-200 hover:bg-red-100 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center transition" onclick="closeModal()">
+                    <i class="fas fa-times text-lg"></i>
                 </div>
+            </div>
 
-                <div class="flex justify-end pt-2">
-                    <button onclick="closeModal()" class="px-4 py-2 bg-slate-200 p-3 rounded-lg text-slate-700 hover:bg-slate-300 font-medium">Fechar</button>
+            <div class="p-6 flex-1 overflow-y-auto custom-scroll bg-white">
+                <div class="relative h-[500px] w-full">
+                    <canvas id="modalChart"></canvas>
                 </div>
             </div>
         </div>
@@ -75,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 15: Drill-down interativo por loja.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 16: Gráficos Interativos (Produto & Diário).</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -84,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-file-invoice-dollar text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-chart-area text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) ou clique aqui</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -101,7 +86,7 @@
                         <span class="text-slate-300">|</span>
                         <button onclick="toggleGlobal(false)" class="text-slate-500 hover:text-slate-700">Nenhum</button>
                         <button onclick="applyFilters()" class="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded shadow-sm transition">
-                            Atualizar Dashboard
+                            Atualizar
                         </button>
                     </div>
                 </div>
@@ -110,13 +95,12 @@
         </div>
 
         <div id="dashboard-content" class="hidden space-y-6 mb-6">
-            
             <div class="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <div class="bg-indigo-700 p-2 rounded-lg"><i class="far fa-calendar-alt text-xl"></i></div>
                     <div>
-                        <p class="text-indigo-200 text-xs uppercase font-bold tracking-wider">Período do Relatório</p>
-                        <h2 class="text-lg font-bold"><span id="period-start">--/--/----</span> <span class="mx-1 text-indigo-400">até</span> <span id="period-end">--/--/----</span></h2>
+                        <p class="text-indigo-200 text-xs uppercase font-bold tracking-wider">Período</p>
+                        <h2 class="text-lg font-bold"><span id="period-start">--</span> <span class="mx-1 text-indigo-400">até</span> <span id="period-end">--</span></h2>
                     </div>
                 </div>
                 <div class="mt-2 md:mt-0 text-right">
@@ -134,26 +118,26 @@
                     </div>
                     <i class="fas fa-times-circle text-red-100 text-3xl"></i>
                 </div>
-
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-400 col-span-2 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
                         <p class="text-xs text-amber-600 uppercase font-bold flex items-center">
                             <i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes
                         </p>
-                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual desconsiderado</span>
+                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual ignorado</span>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
-                        <p class="text-center italic text-slate-400 mt-4">Processando datas...</p>
+                        <p class="text-center italic text-slate-400 mt-4">Calculando...</p>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm">
-                <h4 class="font-bold text-slate-700 mb-1 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€) por Loja</h4>
-                <p class="text-xs text-slate-400 mb-4 flex items-center">
-                    <span class="inline-block w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
-                    Clique em uma barra para ver o detalhe dos produtos (Maior gasto para menor).
-                </p>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <div class="flex justify-between items-end mb-4">
+                    <div>
+                        <h4 class="font-bold text-slate-700 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€)</h4>
+                        <p class="text-xs text-slate-400 mt-1">Clique nas barras para abrir o detalhamento por produto (Semáforo).</p>
+                    </div>
+                </div>
                 <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
             </div>
 
@@ -163,7 +147,7 @@
                     <div class="h-64"><canvas id="paretoChart"></canvas></div>
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h4 class="font-bold text-slate-700 mb-4 text-sm">Tendência de Erros (Diário)</h4>
+                    <h4 class="font-bold text-slate-700 mb-4 text-sm">Tendência de Erros</h4>
                     <div class="h-64"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
@@ -171,9 +155,7 @@
 
         <div id="results-section" class="bg-white rounded-xl shadow-sm overflow-hidden hidden">
             <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                <h2 class="font-semibold text-slate-700 flex items-center">
-                    <i class="fas fa-search mr-2 text-slate-400"></i> Itens com Erro
-                </h2>
+                <h2 class="font-semibold text-slate-700 flex items-center"><i class="fas fa-search mr-2 text-slate-400"></i> Itens com Erro</h2>
                 <button onclick="downloadErrors()" id="btn-download" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition shadow items-center">
                     <i class="fas fa-download mr-2"></i> Baixar Excel
                 </button>
@@ -184,11 +166,11 @@
                         <tr>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Data</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Loja</th>
-                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Item Name</th>
-                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Type</th>
+                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Item</th>
+                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Tipo</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Desc.</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100 text-right">Valor</th>
-                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Problema</th>
+                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Erro</th>
                         </tr>
                     </thead>
                     <tbody id="table-body" class="text-sm divide-y divide-slate-100"></tbody>
@@ -198,7 +180,7 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO
+        // --- CONFIGURAÇÃO ---
         const amConfig = {
             "Sulamita": ["PT001", "PT002", "PT004", "PT009", "PT015", "PT023", "PT029"],
             "Marcelo": ["PT006", "PT008", "PT010", "PT018", "PT012"],
@@ -216,13 +198,20 @@
             "Outros": "border-slate-400 text-slate-600 bg-slate-100"
         };
 
-        // VARIÁVEIS GLOBAIS
+        // --- GLOBAIS ---
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {};
-        // Novo objeto para guardar os detalhes por loja
+        // Estrutura: { 'Loja A': [ {date, name, val}, ... ] }
         let storeDetailsMap = {}; 
-        let paretoChart = null, trendChart = null, storeChart = null;
+        let globalMinDate = null, globalMaxDate = null;
+        
+        // Gráficos
+        let paretoChart = null, trendChart = null, storeChart = null, modalChart = null;
+        
+        // Controle de Estado do Modal
+        let currentModalStore = null;
+        let currentModalView = 'products'; // 'products' ou 'daily'
 
-        // UPLOAD
+        // --- UPLOAD ---
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
         const dropZone = document.getElementById('drop-zone');
         const fileInput = document.getElementById('file-input');
@@ -241,15 +230,15 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "", cellDates: true, raw: false });
-                    if (!rawData.length) throw new Error("Planilha vazia");
+                    if (!rawData.length) throw new Error("Vazia");
                     initializeDashboard();
-                } catch (err) { alert("Erro ao ler arquivo: " + err.message); }
+                } catch (err) { alert("Erro: " + err.message); }
                 finally { document.getElementById('upload-section').classList.remove('loading'); }
             };
             reader.readAsArrayBuffer(file);
         }
 
-        // INICIALIZAÇÃO
+        // --- INICIALIZAÇÃO ---
         function identifyAM(store) {
             for (const [mgr, codes] of Object.entries(amConfig)) if (codes.some(c => store.toUpperCase().includes(c))) return mgr;
             return "Outros";
@@ -275,23 +264,21 @@
             container.innerHTML = '';
             const buckets = { "Sulamita": [], "Marcelo": [], "Monique": [], "José": [], "Outros": [] };
             uniqueStores.forEach(s => buckets[storeToAMMap[s]].push(s));
-
             ["Sulamita", "Marcelo", "Monique", "José", "Outros"].forEach(am => {
                 if (!buckets[am].length && am === "Outros") return;
                 const color = amTailwindColors[am];
-                const card = document.createElement('div');
-                card.className = "bg-slate-50 rounded-lg border border-slate-200 overflow-hidden flex flex-col";
-                card.innerHTML = `
-                    <div class="p-3 border-b border-slate-200 flex justify-between items-center ${color}">
-                        <label class="font-bold text-sm cursor-pointer flex items-center select-none">
-                            <input type="checkbox" class="mr-2 am-master" data-am="${am}" checked onchange="toggleGroup('${am}', this.checked)"> ${am}
-                        </label>
-                        <span class="text-xs bg-white/50 px-2 rounded-full font-mono">${buckets[am].length}</span>
-                    </div>
-                    <div class="p-2 overflow-y-auto max-h-32 custom-scroll space-y-1">
-                        ${buckets[am].map(s => `<label class="flex items-center space-x-2 p-1 hover:bg-white rounded cursor-pointer text-xs"><input type="checkbox" value="${s}" checked class="store-cb am-${am} text-blue-600 rounded"> <span class="truncate" title="${s}">${s}</span></label>`).join('')}
+                container.innerHTML += `
+                    <div class="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden flex flex-col">
+                        <div class="p-3 border-b border-slate-200 flex justify-between items-center ${color}">
+                            <label class="font-bold text-sm cursor-pointer flex items-center select-none">
+                                <input type="checkbox" class="mr-2 am-master" data-am="${am}" checked onchange="toggleGroup('${am}', this.checked)"> ${am}
+                            </label>
+                            <span class="text-xs bg-white/50 px-2 rounded-full font-mono">${buckets[am].length}</span>
+                        </div>
+                        <div class="p-2 overflow-y-auto max-h-32 custom-scroll space-y-1">
+                            ${buckets[am].map(s => `<label class="flex items-center space-x-2 p-1 hover:bg-white rounded cursor-pointer text-xs"><input type="checkbox" value="${s}" checked class="store-cb am-${am} text-blue-600 rounded"> <span class="truncate" title="${s}">${s}</span></label>`).join('')}
+                        </div>
                     </div>`;
-                container.appendChild(card);
             });
         }
 
@@ -311,16 +298,15 @@
             return null;
         }
 
-        // LÓGICA PRINCIPAL (AUDITORIA)
+        // --- LÓGICA DE AUDITORIA ---
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body');
             tbody.innerHTML = '';
             processedErrors = [];
-            storeDetailsMap = {}; // Reset mapa de detalhes
+            storeDetailsMap = {};
             
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
-            let typeCount = {}, trendData = {};
-            let storeTotalWaste = {}; 
+            let typeCount = {}, trendData = {}, storeTotalWaste = {};
             let errorRows = [];
             let allValidDates = [];
 
@@ -330,26 +316,24 @@
                 if (date) allValidDates.push(date);
 
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
-                
-                // Acumula total GERAL por loja
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
-                // --- AGREGAR DETALHES PARA O MODAL ---
+                // Armazenar dados para o Modal
                 if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
                 const name = String(row['Item name']||"").trim();
                 const type = String(row['Item type']||"").trim();
                 const desc = String(row['Description']||"").trim();
                 
+                // Guarda objeto puro para processamento posterior
                 storeDetailsMap[buyer].push({
-                    date: date ? date.toLocaleDateString('pt-PT') : "-",
+                    dateObj: date, // Objeto Date real para ordenação
+                    dateStr: date ? date.toISOString().split('T')[0] : null,
                     name: name,
-                    type: type,
-                    desc: desc,
                     val: val
                 });
-                // -------------------------------------
 
+                // Verificação de Erros
                 let errs = [];
                 if(name.toUpperCase().includes("CPK")) errs.push("Nome contém 'CPK'");
                 const validTypes = ["purchase", "sub-recipe", "inventory item"];
@@ -357,7 +341,6 @@
                     if(type.toLowerCase() === "menu item") errs.push("MENU ITEM deve ser Inventory Item ou Purchase");
                     else errs.push(`Tipo Inválido (${type})`);
                 }
-
                 if(name.toUpperCase().includes("RFU")) {
                     if(type.toLowerCase() !== "sub-recipe") errs.push("RFU deve ser Sub-recipe");
                     else {
@@ -373,16 +356,14 @@
                     const dStr = date ? date.toLocaleDateString('pt-PT') : "-";
                     const trendKey = date ? date.toISOString().split('T')[0] : 'N/A';
                     trendData[trendKey] = (trendData[trendKey] || 0) + 1;
-
-                    errs.forEach(e => {
-                        const k = e.startsWith("Tipo Inválido") ? "Tipo Inválido" : e;
-                        typeCount[k] = (typeCount[k]||0) + 1;
-                    });
+                    errs.forEach(e => typeCount[e.startsWith("Tipo") ? "Tipo Inválido" : e] = (typeCount[e.startsWith("Tipo") ? "Tipo Inválido" : e]||0) + 1);
+                    
                     errorRows.push({ dStr, date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
                     processedErrors.push({ Data: dStr, Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
                 }
             });
 
+            // Renderizar Tabela
             errorRows.sort((a,b) => (a.date && b.date) ? a.date - b.date : 0);
             const frag = document.createDocumentFragment();
             errorRows.forEach(r => {
@@ -400,46 +381,43 @@
             });
             tbody.appendChild(frag);
 
+            // Atualizar UI
             document.getElementById('total-errors').innerText = totalErrCount;
             document.getElementById('error-value-subtext').innerText = "Custo do Erro: € " + totalErrVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
+            // Datas Globais e Faltantes
             if (allValidDates.length > 0) {
                 allValidDates.sort((a,b) => a-b);
-                const minDate = allValidDates[0];
-                const maxDate = allValidDates[allValidDates.length-1];
-                document.getElementById('period-start').innerText = minDate.toLocaleDateString('pt-PT');
-                document.getElementById('period-end').innerText = maxDate.toLocaleDateString('pt-PT');
+                globalMinDate = allValidDates[0];
+                globalMaxDate = allValidDates[allValidDates.length-1];
+                document.getElementById('period-start').innerText = globalMinDate.toLocaleDateString('pt-PT');
+                document.getElementById('period-end').innerText = globalMaxDate.toLocaleDateString('pt-PT');
                 checkMissingDates(allValidDates, activeStores);
             } else {
                 document.getElementById('period-start').innerText = "--";
                 document.getElementById('period-end').innerText = "--";
-                document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas válidas.</p>';
+                document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
 
-            updateCharts(typeCount, trendData, storeTotalWaste);
+            updateMainCharts(typeCount, trendData, storeTotalWaste);
         }
 
+        // --- CHECK DIAS FALTANTES ---
         function checkMissingDates(sortedAllDates, activeStores) {
             const min = sortedAllDates[0];
             const max = sortedAllDates[sortedAllDates.length-1];
+            const todayISO = new Date().toISOString().split('T')[0];
             
-            const today = new Date();
-            const todayISO = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-
             const storePresentDays = {};
             activeStores.forEach(s => storePresentDays[s] = new Set());
-            
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             const activeData = rawData.filter(r => checkboxes.includes(r['Buyer']));
             
             activeData.forEach(r => {
                 const d = parseDate(r['Date']);
-                if(d && r['Buyer']) {
-                    const dISO = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-                    storePresentDays[r['Buyer']].add(dISO);
-                }
+                if(d && r['Buyer']) storePresentDays[r['Buyer']].add(d.toISOString().split('T')[0]);
             });
 
             const log = document.getElementById('missing-dates-log');
@@ -449,12 +427,9 @@
             activeStores.forEach(store => {
                 let missing = [];
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
-                    const iso = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    const iso = d.toISOString().split('T')[0];
                     if (iso === todayISO) continue;
-
-                    if(!storePresentDays[store].has(iso)) {
-                        missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
-                    }
+                    if(!storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                 }
                 if(missing.length > 0) {
                     hasMissing = true;
@@ -462,12 +437,11 @@
                     log.innerHTML += `<div class="mb-1 border-b border-amber-200 pb-1 last:border-0"><strong class="text-amber-800 text-xs">${store}</strong>: <span class="text-xs text-amber-700">${txt}</span></div>`;
                 }
             });
-            if(!hasMissing) {
-                log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
-            }
+            if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        function updateCharts(types, trends, totalWaste) {
+        // --- GRÁFICOS PRINCIPAIS ---
+        function updateMainCharts(types, trends, totalWaste) {
             if(paretoChart) paretoChart.destroy();
             const sortedTypes = Object.entries(types).sort((a,b) => b[1]-a[1]);
             paretoChart = new Chart(document.getElementById('paretoChart'), {
@@ -498,93 +472,184 @@
                 type: 'bar',
                 data: {
                     labels: sortedStores.map(x=>x[0]),
+                    datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }]
+                },
+                options: { 
+                    responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } },
+                    plugins: { 
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } }
+                    },
+                    onClick: (evt, activeElements) => {
+                        if (activeElements.length > 0) {
+                            openModal(sortedStores[activeElements[0].index][0]);
+                        }
+                    },
+                    onHover: (event, chartElement) => event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'
+                }
+            });
+        }
+
+        // --- LÓGICA DO MODAL & DRILL-DOWN ---
+        
+        // 1. Abre Modal Nível 1: Produtos da Loja
+        function openModal(storeName) {
+            currentModalStore = storeName;
+            currentModalView = 'products';
+            
+            document.getElementById('modal-title').innerText = storeName;
+            document.getElementById('modal-subtitle').innerText = "Produtos por maior desperdício (Semáforo)";
+            document.getElementById('btn-back-level').classList.add('hidden');
+            document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none');
+            document.body.classList.add('modal-active');
+
+            // Preparar dados: Agrupar por Produto e Somar Valores
+            const rawItems = storeDetailsMap[storeName] || [];
+            const productAggregation = {};
+            
+            rawItems.forEach(item => {
+                if(!productAggregation[item.name]) productAggregation[item.name] = 0;
+                productAggregation[item.name] += item.val;
+            });
+
+            // Converter para array e ordenar (Maior -> Menor)
+            const sortedProducts = Object.entries(productAggregation)
+                .map(([name, total]) => ({ name, total }))
+                .sort((a, b) => b.total - a.total);
+
+            // Gerar cores (Semáforo)
+            // Divide o array em 3 partes: Topo=Vermelho, Meio=Amarelo, Fim=Verde
+            const totalItems = sortedProducts.length;
+            const bgColors = sortedProducts.map((_, index) => {
+                if (index < totalItems / 3) return '#ef4444'; // Vermelho
+                if (index < (totalItems * 2) / 3) return '#eab308'; // Amarelo
+                return '#22c55e'; // Verde
+            });
+
+            // Renderizar Gráfico
+            if(modalChart) modalChart.destroy();
+            const ctx = document.getElementById('modalChart').getContext('2d');
+            
+            modalChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: sortedProducts.map(p => p.name),
                     datasets: [{
-                        label: 'Desperdício Total (€)',
-                        data: sortedStores.map(x=>x[1]),
-                        backgroundColor: barColors,
+                        label: 'Desperdício (€)',
+                        data: sortedProducts.map(p => p.total),
+                        backgroundColor: bgColors,
                         borderRadius: 4
                     }]
                 },
-                options: { 
-                    responsive: true, 
+                options: {
+                    responsive: true,
                     maintainAspectRatio: false,
-                    scales: { x: { grid: { display: false } } },
-                    plugins: { 
+                    indexAxis: 'y', // Barra horizontal para nomes longos
+                    scales: { x: { beginAtZero: true } },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { 
+                            callbacks: { label: (ctx) => `€ ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } 
+                        }
+                    },
+                    // Clique para Nível 2
+                    onClick: (evt, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const prodName = sortedProducts[activeElements[0].index].name;
+                            showProductDailyDetails(prodName);
+                        }
+                    },
+                    onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
+                }
+            });
+        }
+
+        // 2. Nível 2: Detalhe Diário do Produto
+        function showProductDailyDetails(productName) {
+            currentModalView = 'daily';
+            
+            // Atualizar Header do Modal
+            document.getElementById('modal-title').innerText = productName;
+            document.getElementById('modal-subtitle').innerText = "Evolução diária na " + currentModalStore;
+            document.getElementById('btn-back-level').classList.remove('hidden');
+
+            // Filtrar dados: Apenas este produto, nesta loja
+            const allItems = storeDetailsMap[currentModalStore] || [];
+            const productItems = allItems.filter(i => i.name === productName);
+            
+            // Criar mapa de Data -> Valor
+            const dateValueMap = {};
+            productItems.forEach(i => {
+                if(i.dateStr) {
+                    dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val;
+                }
+            });
+
+            // Gerar Labels (Todas as datas do período global)
+            const labels = [];
+            const dataValues = [];
+            
+            if (globalMinDate && globalMaxDate) {
+                for (let d = new Date(globalMinDate); d <= globalMaxDate; d.setDate(d.getDate() + 1)) {
+                    const iso = d.toISOString().split('T')[0];
+                    const labelPT = d.toLocaleDateString('pt-PT').slice(0,5); // DD/MM
+                    
+                    labels.push(labelPT);
+                    // Se não tiver valor, é 0
+                    dataValues.push(dateValueMap[iso] || 0); 
+                }
+            }
+
+            // Renderizar Gráfico Cronológico
+            if(modalChart) modalChart.destroy();
+            const ctx = document.getElementById('modalChart').getContext('2d');
+
+            modalChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Desperdício (€)',
+                        data: dataValues,
+                        backgroundColor: '#3b82f6',
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    // Volta a ser vertical para linha do tempo
+                    indexAxis: 'x', 
+                    scales: { y: { beginAtZero: true } },
+                    plugins: {
                         legend: { display: false },
                         tooltip: {
                             callbacks: {
                                 label: function(context) {
-                                    const store = context.label;
-                                    const am = storeToAMMap[store];
-                                    return `Total: € ${context.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})} (AM: ${am})`;
+                                    const val = context.raw;
+                                    if (val === 0) return "(Sem desperdício registrado)";
+                                    return `€ ${val.toLocaleString('pt-PT', {minimumFractionDigits: 2})}`;
                                 }
                             }
                         }
-                    },
-                    // --- EVENTO DE CLIQUE IMPLEMENTADO AQUI ---
-                    onClick: (evt, activeElements) => {
-                        if (activeElements.length > 0) {
-                            const index = activeElements[0].index;
-                            const storeName = sortedStores[index][0];
-                            openModal(storeName);
-                        }
-                    },
-                    onHover: (event, chartElement) => {
-                        event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default';
                     }
                 }
             });
         }
 
-        // --- FUNÇÕES DO MODAL ---
-        function openModal(storeName) {
-            const modal = document.getElementById('details-modal');
-            const title = document.getElementById('modal-store-title');
-            const tbody = document.getElementById('modal-table-body');
-            const totalDisplay = document.getElementById('modal-total-value');
-            
-            title.innerText = storeName;
-            tbody.innerHTML = '';
-            
-            // Pega itens da loja e ordena por VALOR decrescente
-            const items = storeDetailsMap[storeName] || [];
-            items.sort((a, b) => b.val - a.val);
-
-            let total = 0;
-            const frag = document.createDocumentFragment();
-
-            items.forEach(item => {
-                total += item.val;
-                const tr = document.createElement('tr');
-                tr.className = "border-b border-slate-100 hover:bg-slate-50";
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-slate-500">${item.date}</td>
-                    <td class="p-3 font-medium text-slate-700">${item.name}</td>
-                    <td class="p-3 text-slate-500 text-xs uppercase">${item.type}</td>
-                    <td class="p-3 text-slate-500 text-xs">${item.desc}</td>
-                    <td class="p-3 font-mono text-slate-700 text-right">€ ${item.val.toFixed(2)}</td>
-                `;
-                frag.appendChild(tr);
-            });
-
-            tbody.appendChild(frag);
-            totalDisplay.innerText = "€ " + total.toLocaleString('pt-PT', {minimumFractionDigits: 2});
-            
-            // Mostrar modal
-            modal.classList.remove('opacity-0', 'pointer-events-none');
-            document.body.classList.add('modal-active');
+        // Navegação Modal
+        function backToStoreLevel() {
+            if (currentModalStore) openModal(currentModalStore);
         }
 
         function closeModal() {
-            const modal = document.getElementById('details-modal');
-            modal.classList.add('opacity-0', 'pointer-events-none');
+            document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none');
             document.body.classList.remove('modal-active');
+            currentModalStore = null;
         }
 
-        // Fechar com ESC
-        document.onkeydown = function(evt) {
-            if (evt.key === "Escape") closeModal();
-        };
+        document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
+
     </script>
 </body>
 </html>
