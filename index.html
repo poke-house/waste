@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V17 (Top Produtos)</title>
+    <title>Dashboard Desperdícios - V18 (Exportação Loja)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -18,8 +18,6 @@
         .custom-scroll::-webkit-scrollbar-track { background: #f1f5f9; }
         .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
         .loading { pointer-events: none; opacity: 0.6; }
-        
-        /* Modal Animation */
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
     </style>
@@ -28,9 +26,11 @@
 
     <div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
         <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div>
+        
         <div class="modal-container bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]">
+            
             <div class="py-4 px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
-                <div class="flex items-center gap-3">
+                <div class="flex items-center gap-4">
                     <button id="btn-back-level" onclick="backToStoreLevel()" class="hidden bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1 rounded-md text-sm shadow-sm transition">
                         <i class="fas fa-arrow-left mr-1"></i> Voltar
                     </button>
@@ -39,10 +39,18 @@
                         <p class="text-sm text-slate-500" id="modal-subtitle">Análise detalhada</p>
                     </div>
                 </div>
-                <div class="cursor-pointer bg-slate-200 hover:bg-red-100 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center transition" onclick="closeModal()">
-                    <i class="fas fa-times text-lg"></i>
+                
+                <div class="flex items-center gap-3">
+                    <button onclick="downloadInteractiveReport()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shadow-sm flex items-center transition">
+                        <i class="fas fa-download mr-2"></i> Baixar Relatório Interativo
+                    </button>
+                    
+                    <div class="cursor-pointer bg-slate-200 hover:bg-red-100 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center transition" onclick="closeModal()">
+                        <i class="fas fa-times text-lg"></i>
+                    </div>
                 </div>
             </div>
+
             <div class="p-6 flex-1 overflow-y-auto custom-scroll bg-white">
                 <div class="relative h-[500px] w-full">
                     <canvas id="modalChart"></canvas>
@@ -55,7 +63,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 17: Substituição de Pareto por Top Produtos (Gasto).</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 18: Exportação de Relatório Interativo por Loja.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -64,7 +72,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-chart-area text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-chart-pie text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) ou clique aqui</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -80,9 +88,7 @@
                         <button onclick="toggleGlobal(true)" class="text-blue-600 hover:text-blue-800 font-medium">Todos</button>
                         <span class="text-slate-300">|</span>
                         <button onclick="toggleGlobal(false)" class="text-slate-500 hover:text-slate-700">Nenhum</button>
-                        <button onclick="applyFilters()" class="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded shadow-sm transition">
-                            Atualizar
-                        </button>
+                        <button onclick="applyFilters()" class="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded shadow-sm transition">Atualizar</button>
                     </div>
                 </div>
                 <div id="am-container" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4"></div>
@@ -115,13 +121,11 @@
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-400 col-span-2 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
-                        <p class="text-xs text-amber-600 uppercase font-bold flex items-center">
-                            <i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes
-                        </p>
+                        <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes</p>
                         <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual ignorado</span>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
-                        <p class="text-center italic text-slate-400 mt-4">Calculando...</p>
+                        <p class="text-center italic text-slate-400 mt-4">Processando...</p>
                     </div>
                 </div>
             </div>
@@ -130,7 +134,7 @@
                 <div class="flex justify-between items-end mb-4">
                     <div>
                         <h4 class="font-bold text-slate-700 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€)</h4>
-                        <p class="text-xs text-slate-400 mt-1">Clique nas barras para abrir o detalhamento da loja.</p>
+                        <p class="text-xs text-slate-400 mt-1">Clique para abrir detalhes e baixar relatório da loja.</p>
                     </div>
                 </div>
                 <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
@@ -138,10 +142,9 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos com Maior Gasto (€)</h4>
+                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos (Maior Gasto)</h4>
                     <div class="h-64"><canvas id="productChart"></canvas></div>
                 </div>
-                
                 <div class="bg-white p-5 rounded-xl shadow-sm">
                     <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-chart-line mr-2 text-slate-400"></i>Tendência de Erros</h4>
                     <div class="h-64"><canvas id="trendChart"></canvas></div>
@@ -163,7 +166,7 @@
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Data</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Loja</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Item</th>
-                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Tipo</th>
+                            <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Type</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Desc.</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100 text-right">Valor</th>
                             <th class="p-3 text-xs font-bold text-slate-500 uppercase bg-slate-100">Erro</th>
@@ -176,38 +179,22 @@
     </div>
 
     <script>
-        // --- CONFIGURAÇÃO ---
         const amConfig = {
             "Sulamita": ["PT001", "PT002", "PT004", "PT009", "PT015", "PT023", "PT029"],
             "Marcelo": ["PT006", "PT008", "PT010", "PT018", "PT012"],
             "Monique": ["PT013", "PT014", "PT016", "PT017", "PT019", "PT021"],
             "José": ["PT003", "PT005", "PT011", "PT020", "PT022", "PT024", "PT026", "PT028", "PT030"]
         };
-        const amHexColors = {
-            "Sulamita": "#7c3aed", "Marcelo": "#2563eb", "Monique": "#db2777", "José": "#ea580c", "Outros": "#64748b"
-        };
-        const amTailwindColors = {
-            "Sulamita": "border-violet-500 text-violet-700 bg-violet-50",
-            "Marcelo": "border-blue-500 text-blue-700 bg-blue-50",
-            "Monique": "border-pink-500 text-pink-700 bg-pink-50",
-            "José": "border-orange-500 text-orange-700 bg-orange-50",
-            "Outros": "border-slate-400 text-slate-600 bg-slate-100"
-        };
+        const amHexColors = { "Sulamita": "#7c3aed", "Marcelo": "#2563eb", "Monique": "#db2777", "José": "#ea580c", "Outros": "#64748b" };
+        const amTailwindColors = { "Sulamita": "border-violet-500 text-violet-700 bg-violet-50", "Marcelo": "border-blue-500 text-blue-700 bg-blue-50", "Monique": "border-pink-500 text-pink-700 bg-pink-50", "José": "border-orange-500 text-orange-700 bg-orange-50", "Outros": "border-slate-400 text-slate-600 bg-slate-100" };
 
-        // --- GLOBAIS ---
-        let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {};
-        let storeDetailsMap = {}; 
+        let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {}, storeDetailsMap = {};
         let globalMinDate = null, globalMaxDate = null;
-        
         let productChart = null, trendChart = null, storeChart = null, modalChart = null;
-        
         let currentModalStore = null;
 
-        // --- UPLOAD ---
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
-        const dropZone = document.getElementById('drop-zone');
-        const fileInput = document.getElementById('file-input');
-        
+        const dropZone = document.getElementById('drop-zone'), fileInput = document.getElementById('file-input');
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
         dropZone.addEventListener('dragleave', () => dropZone.classList.remove('active'));
@@ -230,7 +217,6 @@
             reader.readAsArrayBuffer(file);
         }
 
-        // --- INICIALIZAÇÃO ---
         function identifyAM(store) {
             for (const [mgr, codes] of Object.entries(amConfig)) if (codes.some(c => store.toUpperCase().includes(c))) return mgr;
             return "Outros";
@@ -241,10 +227,8 @@
             rawData.forEach(r => { if(r['Buyer']) storesSet.add(r['Buyer']); });
             uniqueStores = Array.from(storesSet).sort();
             uniqueStores.forEach(s => storeToAMMap[s] = identifyAM(s));
-
             renderCheckboxes();
             applyFilters();
-
             document.getElementById('upload-section').classList.add('hidden');
             document.getElementById('filter-section').classList.remove('hidden');
             document.getElementById('dashboard-content').classList.remove('hidden');
@@ -252,8 +236,7 @@
         }
 
         function renderCheckboxes() {
-            const container = document.getElementById('am-container');
-            container.innerHTML = '';
+            const container = document.getElementById('am-container'); container.innerHTML = '';
             const buckets = { "Sulamita": [], "Marcelo": [], "Monique": [], "José": [], "Outros": [] };
             uniqueStores.forEach(s => buckets[storeToAMMap[s]].push(s));
             ["Sulamita", "Marcelo", "Monique", "José", "Outros"].forEach(am => {
@@ -262,9 +245,7 @@
                 container.innerHTML += `
                     <div class="bg-slate-50 rounded-lg border border-slate-200 overflow-hidden flex flex-col">
                         <div class="p-3 border-b border-slate-200 flex justify-between items-center ${color}">
-                            <label class="font-bold text-sm cursor-pointer flex items-center select-none">
-                                <input type="checkbox" class="mr-2 am-master" data-am="${am}" checked onchange="toggleGroup('${am}', this.checked)"> ${am}
-                            </label>
+                            <label class="font-bold text-sm cursor-pointer select-none"><input type="checkbox" class="mr-2 am-master" data-am="${am}" checked onchange="toggleGroup('${am}', this.checked)"> ${am}</label>
                             <span class="text-xs bg-white/50 px-2 rounded-full font-mono">${buckets[am].length}</span>
                         </div>
                         <div class="p-2 overflow-y-auto max-h-32 custom-scroll space-y-1">
@@ -290,219 +271,111 @@
             return null;
         }
 
-        // --- LÓGICA DE AUDITORIA ---
         function runAudit(data, activeStores) {
-            const tbody = document.getElementById('table-body');
-            tbody.innerHTML = '';
-            processedErrors = [];
-            storeDetailsMap = {};
-            
+            const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
+            processedErrors = []; storeDetailsMap = {};
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
             let trendData = {}, storeTotalWaste = {}, productTotalWaste = {};
-            let errorRows = [];
-            let allValidDates = [];
+            let errorRows = [], allValidDates = [];
 
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
                 if (date) allValidDates.push(date);
-
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
-                
-                // Acumuladores
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
-                const name = String(row['Item name']||"").trim();
-                const type = String(row['Item type']||"").trim();
-                const desc = String(row['Description']||"").trim();
-                
-                // Soma para o gráfico de produtos (NOVO)
-                if (name) {
-                    productTotalWaste[name] = (productTotalWaste[name] || 0) + val;
-                }
+                const name = String(row['Item name']||"").trim(), type = String(row['Item type']||"").trim(), desc = String(row['Description']||"").trim();
+                if (name) productTotalWaste[name] = (productTotalWaste[name] || 0) + val;
 
-                // Armazenar dados para o Modal
                 if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
-                storeDetailsMap[buyer].push({
-                    dateObj: date,
-                    dateStr: date ? date.toISOString().split('T')[0] : null,
-                    name: name,
-                    val: val
-                });
+                storeDetailsMap[buyer].push({ dateStr: date ? date.toISOString().split('T')[0] : null, name, val });
 
-                // Verificação de Erros
                 let errs = [];
                 if(name.toUpperCase().includes("CPK")) errs.push("Nome contém 'CPK'");
                 const validTypes = ["purchase", "sub-recipe", "inventory item"];
-                if(!validTypes.includes(type.toLowerCase())) {
-                    if(type.toLowerCase() === "menu item") errs.push("MENU ITEM deve ser Inventory Item ou Purchase");
-                    else errs.push(`Tipo Inválido (${type})`);
-                }
+                if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 if(name.toUpperCase().includes("RFU")) {
                     if(type.toLowerCase() !== "sub-recipe") errs.push("RFU deve ser Sub-recipe");
-                    else {
-                        const dl = desc.toLowerCase();
-                        if(dl !== "end of day" && !dl.includes("expired") && !dl.includes("spoiled")) 
-                            errs.push("RFU deve ser 'End of Day' ou 'Expired/Spoiled'");
-                    }
+                    else if(desc.toLowerCase() !== "end of day" && !desc.toLowerCase().includes("expired") && !desc.toLowerCase().includes("spoiled")) errs.push("RFU deve ser 'End of Day' ou 'Expired/Spoiled'");
                 }
 
                 if(errs.length > 0) {
-                    totalErrCount++;
-                    totalErrVal += val;
-                    const dStr = date ? date.toLocaleDateString('pt-PT') : "-";
+                    totalErrCount++; totalErrVal += val;
                     const trendKey = date ? date.toISOString().split('T')[0] : 'N/A';
                     trendData[trendKey] = (trendData[trendKey] || 0) + 1;
-                    
-                    errorRows.push({ dStr, date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
-                    processedErrors.push({ Data: dStr, Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
+                    errorRows.push({ dStr: date?date.toLocaleDateString('pt-PT'):"-", date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
+                    processedErrors.push({ Data: date?date.toLocaleDateString('pt-PT'):"-", Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
                 }
             });
 
-            // Renderizar Tabela
             errorRows.sort((a,b) => (a.date && b.date) ? a.date - b.date : 0);
             const frag = document.createDocumentFragment();
             errorRows.forEach(r => {
                 const tr = document.createElement('tr');
                 tr.className = "border-b border-slate-100 bg-red-50 hover:bg-red-100 transition";
-                tr.innerHTML = `
-                    <td class="p-3 font-mono text-xs text-slate-600">${r.dStr}</td>
-                    <td class="p-3 text-xs text-slate-700 font-medium">${r.buyer}<br><span class="text-[10px] text-slate-400">${r.am}</span></td>
-                    <td class="p-3 text-xs text-slate-800">${r.name}</td>
-                    <td class="p-3 text-xs text-slate-500 uppercase">${r.type}</td>
-                    <td class="p-3 text-xs text-slate-500">${r.desc}</td>
-                    <td class="p-3 font-mono text-xs text-right">€ ${r.val.toFixed(2)}</td>
-                    <td class="p-3 text-xs text-red-600 font-medium leading-tight">${r.errs.join('<br>')}</td>`;
+                tr.innerHTML = `<td class="p-3 font-mono text-xs text-slate-600">${r.dStr}</td><td class="p-3 text-xs text-slate-700 font-medium">${r.buyer}<br><span class="text-[10px] text-slate-400">${r.am}</span></td><td class="p-3 text-xs text-slate-800">${r.name}</td><td class="p-3 text-xs text-slate-500 uppercase">${r.type}</td><td class="p-3 text-xs text-slate-500">${r.desc}</td><td class="p-3 font-mono text-xs text-right">€ ${r.val.toFixed(2)}</td><td class="p-3 text-xs text-red-600 font-medium leading-tight">${r.errs.join('<br>')}</td>`;
                 frag.appendChild(tr);
             });
             tbody.appendChild(frag);
 
-            // Atualizar UI
             document.getElementById('total-errors').innerText = totalErrCount;
             document.getElementById('error-value-subtext').innerText = "Custo do Erro: € " + totalErrVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
-            // Datas Globais e Faltantes
             if (allValidDates.length > 0) {
                 allValidDates.sort((a,b) => a-b);
-                globalMinDate = allValidDates[0];
-                globalMaxDate = allValidDates[allValidDates.length-1];
+                globalMinDate = allValidDates[0]; globalMaxDate = allValidDates[allValidDates.length-1];
                 document.getElementById('period-start').innerText = globalMinDate.toLocaleDateString('pt-PT');
                 document.getElementById('period-end').innerText = globalMaxDate.toLocaleDateString('pt-PT');
                 checkMissingDates(allValidDates, activeStores);
             } else {
-                document.getElementById('period-start').innerText = "--";
-                document.getElementById('period-end').innerText = "--";
+                document.getElementById('period-start').innerText = "--"; document.getElementById('period-end').innerText = "--";
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
-
             updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
         }
 
-        // --- CHECK DIAS FALTANTES ---
         function checkMissingDates(sortedAllDates, activeStores) {
-            const min = sortedAllDates[0];
-            const max = sortedAllDates[sortedAllDates.length-1];
-            const todayISO = new Date().toISOString().split('T')[0];
-            
-            const storePresentDays = {};
-            activeStores.forEach(s => storePresentDays[s] = new Set());
+            const min = sortedAllDates[0], max = sortedAllDates[sortedAllDates.length-1], todayISO = new Date().toISOString().split('T')[0];
+            const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
-            const activeData = rawData.filter(r => checkboxes.includes(r['Buyer']));
-            
-            activeData.forEach(r => {
-                const d = parseDate(r['Date']);
-                if(d && r['Buyer']) storePresentDays[r['Buyer']].add(d.toISOString().split('T')[0]);
+            rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
+                const d = parseDate(r['Date']); if(d && r['Buyer']) storePresentDays[r['Buyer']].add(d.toISOString().split('T')[0]);
             });
-
-            const log = document.getElementById('missing-dates-log');
-            log.innerHTML = '';
-            let hasMissing = false;
-
+            const log = document.getElementById('missing-dates-log'); log.innerHTML = ''; let hasMissing = false;
             activeStores.forEach(store => {
                 let missing = [];
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
                     const iso = d.toISOString().split('T')[0];
-                    if (iso === todayISO) continue;
-                    if(!storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
+                    if (iso !== todayISO && !storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                 }
                 if(missing.length > 0) {
                     hasMissing = true;
-                    const txt = missing.length > 6 ? `${missing.slice(0,6).join(", ")}... (+${missing.length-6})` : missing.join(", ");
-                    log.innerHTML += `<div class="mb-1 border-b border-amber-200 pb-1 last:border-0"><strong class="text-amber-800 text-xs">${store}</strong>: <span class="text-xs text-amber-700">${txt}</span></div>`;
+                    log.innerHTML += `<div class="mb-1 border-b border-amber-200 pb-1 last:border-0"><strong class="text-amber-800 text-xs">${store}</strong>: <span class="text-xs text-amber-700">${missing.length>6 ? missing.slice(0,6).join(", ")+"... (+"+(missing.length-6)+")" : missing.join(", ")}</span></div>`;
                 }
             });
             if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        // --- GRÁFICOS PRINCIPAIS ---
         function updateMainCharts(products, trends, totalWaste) {
-            // 1. TOP PRODUTOS (Substitui Pareto de Erros)
             if(productChart) productChart.destroy();
-            const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10); // Top 10
-            
-            productChart = new Chart(document.getElementById('productChart'), {
-                type: 'bar',
-                data: {
-                    labels: sortedProducts.map(x=>x[0]),
-                    datasets: [{ 
-                        label: 'Total (€)', 
-                        data: sortedProducts.map(x=>x[1]), 
-                        backgroundColor: '#f59e0b', // Amber
-                        borderRadius: 4 
-                    }]
-                },
-                options: { 
-                    indexAxis: 'y', 
-                    responsive: true, 
-                    maintainAspectRatio: false, 
-                    plugins: { legend: {display:false} } 
-                }
-            });
+            const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10);
+            productChart = new Chart(document.getElementById('productChart'), { type: 'bar', data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
 
-            // 2. TENDÊNCIA
             if(trendChart) trendChart.destroy();
             const sortedDates = Object.keys(trends).sort();
-            trendChart = new Chart(document.getElementById('trendChart'), {
-                type: 'line',
-                data: {
-                    labels: sortedDates.map(d=>d.split('-').reverse().slice(0,2).join('/')),
-                    datasets: [{ label: 'Erros', data: sortedDates.map(d=>trends[d]), borderColor: '#3b82f6', backgroundColor: '#eff6ff', fill: true, tension: 0.3 }]
-                },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
-            });
+            trendChart = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: sortedDates.map(d=>d.split('-').reverse().slice(0,2).join('/')), datasets: [{ label: 'Erros', data: sortedDates.map(d=>trends[d]), borderColor: '#3b82f6', backgroundColor: '#eff6ff', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
 
-            // 3. LOJAS (TOTAL WASTE)
             if(storeChart) storeChart.destroy();
             const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
-
-            storeChart = new Chart(document.getElementById('storeChart'), {
-                type: 'bar',
-                data: {
-                    labels: sortedStores.map(x=>x[0]),
-                    datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }]
-                },
-                options: { 
-                    responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } },
-                    plugins: { 
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } }
-                    },
-                    onClick: (evt, activeElements) => {
-                        if (activeElements.length > 0) {
-                            openModal(sortedStores[activeElements[0].index][0]);
-                        }
-                    },
-                    onHover: (event, chartElement) => event.native.target.style.cursor = chartElement[0] ? 'pointer' : 'default'
-                }
-            });
+            storeChart = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- LÓGICA DO MODAL & DRILL-DOWN ---
-        
+        // --- LÓGICA DO MODAL ---
         function openModal(storeName) {
             currentModalStore = storeName;
             document.getElementById('modal-title').innerText = storeName;
@@ -513,104 +386,149 @@
 
             const rawItems = storeDetailsMap[storeName] || [];
             const productAggregation = {};
-            rawItems.forEach(item => {
-                if(!productAggregation[item.name]) productAggregation[item.name] = 0;
-                productAggregation[item.name] += item.val;
-            });
-
-            const sortedProducts = Object.entries(productAggregation)
-                .map(([name, total]) => ({ name, total }))
-                .sort((a, b) => b.total - a.total);
-
+            rawItems.forEach(item => productAggregation[item.name] = (productAggregation[item.name] || 0) + item.val);
+            const sortedProducts = Object.entries(productAggregation).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
             const totalItems = sortedProducts.length;
-            const bgColors = sortedProducts.map((_, index) => {
-                if (index < totalItems / 3) return '#ef4444'; // Vermelho
-                if (index < (totalItems * 2) / 3) return '#eab308'; // Amarelo
-                return '#22c55e'; // Verde
-            });
+            const bgColors = sortedProducts.map((_, index) => index < totalItems / 3 ? '#ef4444' : (index < (totalItems * 2) / 3 ? '#eab308' : '#22c55e'));
 
             if(modalChart) modalChart.destroy();
             const ctx = document.getElementById('modalChart').getContext('2d');
-            
-            modalChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: sortedProducts.map(p => p.name),
-                    datasets: [{ label: 'Desperdício (€)', data: sortedProducts.map(p => p.total), backgroundColor: bgColors, borderRadius: 4 }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false, indexAxis: 'y',
-                    scales: { x: { beginAtZero: true } },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => `€ ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } }
-                    },
-                    onClick: (evt, activeElements) => {
-                        if (activeElements.length > 0) {
-                            const prodName = sortedProducts[activeElements[0].index].name;
-                            showProductDailyDetails(prodName);
-                        }
-                    },
-                    onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
-                }
-            });
+            modalChart = new Chart(ctx, { type: 'bar', data: { labels: sortedProducts.map(p => p.name), datasets: [{ label: 'Desperdício (€)', data: sortedProducts.map(p => p.total), backgroundColor: bgColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) showProductDailyDetails(sortedProducts[activeElements[0].index].name); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
         function showProductDailyDetails(productName) {
             document.getElementById('modal-title').innerText = productName;
             document.getElementById('modal-subtitle').innerText = "Evolução diária na " + currentModalStore;
             document.getElementById('btn-back-level').classList.remove('hidden');
-
             const allItems = storeDetailsMap[currentModalStore] || [];
-            const productItems = allItems.filter(i => i.name === productName);
             const dateValueMap = {};
-            productItems.forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
-
+            allItems.filter(i => i.name === productName).forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
             const labels = [], dataValues = [];
             if (globalMinDate && globalMaxDate) {
                 for (let d = new Date(globalMinDate); d <= globalMaxDate; d.setDate(d.getDate() + 1)) {
                     const iso = d.toISOString().split('T')[0];
-                    const labelPT = d.toLocaleDateString('pt-PT').slice(0,5);
-                    labels.push(labelPT);
+                    labels.push(d.toLocaleDateString('pt-PT').slice(0,5));
                     dataValues.push(dateValueMap[iso] || 0); 
                 }
             }
-
             if(modalChart) modalChart.destroy();
             const ctx = document.getElementById('modalChart').getContext('2d');
-            modalChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: labels,
-                    datasets: [{ label: 'Desperdício (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }]
-                },
-                options: {
-                    responsive: true, maintainAspectRatio: false, indexAxis: 'x', 
-                    scales: { y: { beginAtZero: true } },
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            callbacks: {
-                                label: function(context) {
-                                    const val = context.raw;
-                                    if (val === 0) return "(Sem desperdício registrado)";
-                                    return `€ ${val.toLocaleString('pt-PT', {minimumFractionDigits: 2})}`;
-                                }
-                            }
-                        }
-                    }
-                }
-            });
+            modalChart = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Desperdício (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => context.raw === 0 ? "(Sem desperdício)" : `€ ${context.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } } } });
         }
 
         function backToStoreLevel() { if (currentModalStore) openModal(currentModalStore); }
-        function closeModal() {
-            document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none');
-            document.body.classList.remove('modal-active');
-            currentModalStore = null;
+        function closeModal() { document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); currentModalStore = null; }
+        
+        // --- FUNÇÃO DE DOWNLOAD INTERATIVO ---
+        function downloadInteractiveReport() {
+            if (!currentModalStore) return;
+            const items = storeDetailsMap[currentModalStore] || [];
+            const pStart = document.getElementById('period-start').innerText;
+            const pEnd = document.getElementById('period-end').innerText;
+            const minD = globalMinDate ? globalMinDate.toISOString() : null;
+            const maxD = globalMaxDate ? globalMaxDate.toISOString() : null;
+
+            const htmlContent = `
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Relatório - ${currentModalStore}</title>
+<script src="https://cdn.tailwindcss.com"><\/script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
+<style>body{font-family:'Segoe UI',sans-serif;background-color:#f8fafc}.custom-scroll::-webkit-scrollbar{width:6px}.custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}</style>
+</head>
+<body class="p-6 text-slate-800">
+<div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+<div class="bg-slate-800 text-white p-6 flex justify-between items-center">
+<div><h1 class="text-2xl font-bold">${currentModalStore}</h1><p class="text-slate-300 text-sm">Relatório de Desperdício (${pStart} até ${pEnd})</p></div>
+<button onclick="window.print()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm"><i class="fas fa-print"></i> Imprimir</button>
+</div>
+<div class="p-6">
+<div class="flex justify-between items-center mb-4">
+<button id="btn-back" onclick="renderProductView()" class="hidden text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded text-slate-600 font-bold">&larr; Voltar para Produtos</button>
+<h2 id="chart-title" class="text-lg font-bold text-slate-700">Ranking de Produtos</h2>
+</div>
+<div class="relative h-[500px] w-full"><canvas id="mainChart"></canvas></div>
+</div>
+</div>
+<script>
+const rawData = ${JSON.stringify(items)};
+const minDateStr = "${minD}"; const maxDateStr = "${maxD}";
+let chartInstance = null;
+
+function renderProductView() {
+    document.getElementById('btn-back').classList.add('hidden');
+    document.getElementById('chart-title').innerText = "Ranking de Produtos por Custo (Semáforo)";
+    
+    const agg = {}; rawData.forEach(i => agg[i.name] = (agg[i.name]||0) + i.val);
+    const sorted = Object.entries(agg).map(([n,v])=>({name:n, val:v})).sort((a,b)=>b.val-a.val);
+    
+    const total = sorted.length;
+    const colors = sorted.map((_,i) => i < total/3 ? '#ef4444' : (i < (total*2)/3 ? '#eab308' : '#22c55e'));
+
+    if(chartInstance) chartInstance.destroy();
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    chartInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: colors, borderRadius: 4 }] },
+        options: {
+            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+            plugins: { legend: {display:false}, tooltip: {callbacks: {label: (c)=> '€ '+c.raw.toFixed(2)}} },
+            onClick: (e, el) => { if(el.length) renderDailyView(sorted[el[0].index].name); },
+            onHover: (e, el) => e.native.target.style.cursor = el[0]?'pointer':'default'
+        }
+    });
+}
+
+function renderDailyView(prodName) {
+    document.getElementById('btn-back').classList.remove('hidden');
+    document.getElementById('chart-title').innerText = "Evolução Diária: " + prodName;
+    
+    const prodItems = rawData.filter(i => i.name === prodName);
+    const dateMap = {}; prodItems.forEach(i => { if(i.dateStr) dateMap[i.dateStr] = (dateMap[i.dateStr]||0) + i.val; });
+    
+    const labels = [], data = [];
+    if(minDateStr && maxDateStr) {
+        const dCurrent = new Date(minDateStr); const dEnd = new Date(maxDateStr);
+        while(dCurrent <= dEnd) {
+            const iso = dCurrent.toISOString().split('T')[0];
+            labels.push(dCurrent.toLocaleDateString('pt-PT').slice(0,5));
+            data.push(dateMap[iso] || 0);
+            dCurrent.setDate(dCurrent.getDate() + 1);
+        }
+    }
+
+    if(chartInstance) chartInstance.destroy();
+    chartInstance = new Chart(document.getElementById('mainChart'), {
+        type: 'bar',
+        data: { labels: labels, datasets: [{ label: 'Gasto (€)', data: data, backgroundColor: '#3b82f6' }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
+    });
+}
+
+// Init
+renderProductView();
+<\/script></body></html>`;
+
+            const blob = new Blob([htmlContent], { type: "text/html" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `Relatorio_${currentModalStore.replace(/[^a-z0-9]/gi, '_')}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+
+        function downloadErrors() {
+            if (processedErrors.length === 0) return;
+            const ws = XLSX.utils.json_to_sheet(processedErrors);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Erros");
+            XLSX.writeFile(wb, "Relatorio_Erros_Auditados.xlsx");
         }
         document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
-
     </script>
 </body>
 </html>
