@@ -3,11 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V18 (Exportação Loja)</title>
+    <title>Dashboard Desperdícios - V19 (Evolução Semanal)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
@@ -28,7 +29,6 @@
         <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div>
         
         <div class="modal-container bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]">
-            
             <div class="py-4 px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <div class="flex items-center gap-4">
                     <button id="btn-back-level" onclick="backToStoreLevel()" class="hidden bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1 rounded-md text-sm shadow-sm transition">
@@ -42,15 +42,13 @@
                 
                 <div class="flex items-center gap-3">
                     <button onclick="downloadInteractiveReport()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shadow-sm flex items-center transition">
-                        <i class="fas fa-download mr-2"></i> Baixar Relatório Interativo
+                        <i class="fas fa-download mr-2"></i> Baixar Relatório
                     </button>
-                    
                     <div class="cursor-pointer bg-slate-200 hover:bg-red-100 hover:text-red-600 rounded-full w-8 h-8 flex items-center justify-center transition" onclick="closeModal()">
                         <i class="fas fa-times text-lg"></i>
                     </div>
                 </div>
             </div>
-
             <div class="p-6 flex-1 overflow-y-auto custom-scroll bg-white">
                 <div class="relative h-[500px] w-full">
                     <canvas id="modalChart"></canvas>
@@ -63,7 +61,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 18: Exportação de Relatório Interativo por Loja.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 19: Análise de Evolução Semanal (Seg-Dom).</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -72,7 +70,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-chart-pie text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-calendar-week text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) ou clique aqui</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -96,6 +94,7 @@
         </div>
 
         <div id="dashboard-content" class="hidden space-y-6 mb-6">
+            
             <div class="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <div class="bg-indigo-700 p-2 rounded-lg"><i class="far fa-calendar-alt text-xl"></i></div>
@@ -130,13 +129,22 @@
                 </div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
-                <div class="flex justify-between items-end mb-4">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-indigo-100">
+                <div class="flex justify-between items-center mb-4">
                     <div>
-                        <h4 class="font-bold text-slate-700 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€)</h4>
-                        <p class="text-xs text-slate-400 mt-1">Clique para abrir detalhes e baixar relatório da loja.</p>
+                        <h4 class="font-bold text-indigo-900 text-lg flex items-center">
+                            <i class="fas fa-chart-line mr-2 text-indigo-500"></i>Evolução Semanal do Desperdício
+                        </h4>
+                        <p class="text-xs text-slate-500 mt-1">Comparativo de Segunda a Domingo. <span id="weekly-trend-indicator" class="font-bold ml-2"></span></p>
                     </div>
                 </div>
+                <div class="h-72 w-full">
+                    <canvas id="weeklyChart"></canvas>
+                </div>
+            </div>
+
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100">
+                <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-chart-bar mr-2 text-slate-400"></i>Ranking de Desperdício Total (€)</h4>
                 <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
             </div>
 
@@ -146,7 +154,7 @@
                     <div class="h-64"><canvas id="productChart"></canvas></div>
                 </div>
                 <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-chart-line mr-2 text-slate-400"></i>Tendência de Erros</h4>
+                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-calendar-day mr-2 text-slate-400"></i>Detalhamento Diário (Geral)</h4>
                     <div class="h-64"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
@@ -190,7 +198,7 @@
 
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {}, storeDetailsMap = {};
         let globalMinDate = null, globalMaxDate = null;
-        let productChart = null, trendChart = null, storeChart = null, modalChart = null;
+        let productChart = null, trendChart = null, storeChart = null, modalChart = null, weeklyChart = null;
         let currentModalStore = null;
 
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
@@ -271,11 +279,27 @@
             return null;
         }
 
+        // --- HELPER DE SEMANAS ---
+        function getWeekLabel(date) {
+            const d = new Date(date);
+            const day = d.getDay();
+            const diff = d.getDate() - day + (day == 0 ? -6 : 1); // Ajusta para Segunda
+            const monday = new Date(d.setDate(diff));
+            const sunday = new Date(monday);
+            sunday.setDate(monday.getDate() + 6);
+            
+            const format = (dt) => dt.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+            return {
+                label: `${format(monday)} - ${format(sunday)}`,
+                sortKey: monday.getTime()
+            };
+        }
+
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
             processedErrors = []; storeDetailsMap = {};
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
-            let trendData = {}, storeTotalWaste = {}, productTotalWaste = {};
+            let trendData = {}, storeTotalWaste = {}, productTotalWaste = {}, weeklyData = {};
             let errorRows = [], allValidDates = [];
 
             data.forEach(row => {
@@ -285,6 +309,13 @@
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
+
+                // Agregação Semanal (Valor Total)
+                if (date) {
+                    const week = getWeekLabel(date);
+                    if (!weeklyData[week.label]) weeklyData[week.label] = { val: 0, sort: week.sortKey };
+                    weeklyData[week.label].val += val;
+                }
 
                 const name = String(row['Item name']||"").trim(), type = String(row['Item type']||"").trim(), desc = String(row['Description']||"").trim();
                 if (name) productTotalWaste[name] = (productTotalWaste[name] || 0) + val;
@@ -335,7 +366,7 @@
                 document.getElementById('period-start').innerText = "--"; document.getElementById('period-end').innerText = "--";
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
-            updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
+            updateMainCharts(productTotalWaste, trendData, storeTotalWaste, weeklyData);
         }
 
         function checkMissingDates(sortedAllDates, activeStores) {
@@ -360,22 +391,75 @@
             if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        function updateMainCharts(products, trends, totalWaste) {
+        function updateMainCharts(products, trends, totalWaste, weeklyData) {
+            // TOP PRODUTOS
             if(productChart) productChart.destroy();
             const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10);
             productChart = new Chart(document.getElementById('productChart'), { type: 'bar', data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
 
+            // TENDÊNCIA DIÁRIA
             if(trendChart) trendChart.destroy();
             const sortedDates = Object.keys(trends).sort();
             trendChart = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: sortedDates.map(d=>d.split('-').reverse().slice(0,2).join('/')), datasets: [{ label: 'Erros', data: sortedDates.map(d=>trends[d]), borderColor: '#3b82f6', backgroundColor: '#eff6ff', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
 
+            // EVOLUÇÃO SEMANAL (NOVO)
+            if(weeklyChart) weeklyChart.destroy();
+            const sortedWeeks = Object.entries(weeklyData).sort((a,b) => a[1].sort - b[1].sort);
+            const weeklyLabels = sortedWeeks.map(x => x[0]);
+            const weeklyValues = sortedWeeks.map(x => x[1].val);
+            
+            // Indicador de Tendência
+            const ind = document.getElementById('weekly-trend-indicator');
+            if (weeklyValues.length >= 2) {
+                const last = weeklyValues[weeklyValues.length-1];
+                const prev = weeklyValues[weeklyValues.length-2];
+                const diff = last - prev;
+                const icon = diff > 0 ? "⬆️ Aumento" : "⬇️ Queda";
+                const color = diff > 0 ? "text-red-500" : "text-green-500";
+                ind.innerHTML = `<span class="${color}">${icon} (€ ${Math.abs(diff).toFixed(0)})</span>`;
+            } else {
+                ind.innerHTML = "";
+            }
+
+            weeklyChart = new Chart(document.getElementById('weeklyChart'), {
+                type: 'line',
+                data: {
+                    labels: weeklyLabels,
+                    datasets: [{
+                        label: 'Desperdício Semanal (€)',
+                        data: weeklyValues,
+                        borderColor: '#6366f1', // Indigo
+                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.3,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: '#6366f1',
+                        pointRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } }
+                    },
+                    scales: {
+                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+
+            // LOJAS
             if(storeChart) storeChart.destroy();
             const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
             storeChart = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- LÓGICA DO MODAL ---
+        // --- LÓGICA DO MODAL & DOWNLOAD OFFLINE ---
         function openModal(storeName) {
             currentModalStore = storeName;
             document.getElementById('modal-title').innerText = storeName;
@@ -419,7 +503,6 @@
         function backToStoreLevel() { if (currentModalStore) openModal(currentModalStore); }
         function closeModal() { document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); currentModalStore = null; }
         
-        // --- FUNÇÃO DE DOWNLOAD INTERATIVO ---
         function downloadInteractiveReport() {
             if (!currentModalStore) return;
             const items = storeDetailsMap[currentModalStore] || [];
@@ -460,13 +543,10 @@ let chartInstance = null;
 function renderProductView() {
     document.getElementById('btn-back').classList.add('hidden');
     document.getElementById('chart-title').innerText = "Ranking de Produtos por Custo (Semáforo)";
-    
     const agg = {}; rawData.forEach(i => agg[i.name] = (agg[i.name]||0) + i.val);
     const sorted = Object.entries(agg).map(([n,v])=>({name:n, val:v})).sort((a,b)=>b.val-a.val);
-    
     const total = sorted.length;
     const colors = sorted.map((_,i) => i < total/3 ? '#ef4444' : (i < (total*2)/3 ? '#eab308' : '#22c55e'));
-
     if(chartInstance) chartInstance.destroy();
     const ctx = document.getElementById('mainChart').getContext('2d');
     chartInstance = new Chart(ctx, {
@@ -484,10 +564,8 @@ function renderProductView() {
 function renderDailyView(prodName) {
     document.getElementById('btn-back').classList.remove('hidden');
     document.getElementById('chart-title').innerText = "Evolução Diária: " + prodName;
-    
     const prodItems = rawData.filter(i => i.name === prodName);
     const dateMap = {}; prodItems.forEach(i => { if(i.dateStr) dateMap[i.dateStr] = (dateMap[i.dateStr]||0) + i.val; });
-    
     const labels = [], data = [];
     if(minDateStr && maxDateStr) {
         const dCurrent = new Date(minDateStr); const dEnd = new Date(maxDateStr);
@@ -498,7 +576,6 @@ function renderDailyView(prodName) {
             dCurrent.setDate(dCurrent.getDate() + 1);
         }
     }
-
     if(chartInstance) chartInstance.destroy();
     chartInstance = new Chart(document.getElementById('mainChart'), {
         type: 'bar',
@@ -506,11 +583,8 @@ function renderDailyView(prodName) {
         options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
     });
 }
-
-// Init
 renderProductView();
 <\/script></body></html>`;
-
             const blob = new Blob([htmlContent], { type: "text/html" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
