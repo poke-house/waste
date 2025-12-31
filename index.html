@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V19 (Evolução Semanal)</title>
+    <title>Dashboard Desperdícios - V20 (Evolução Temporal Completa)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 
     <style>
@@ -21,13 +20,16 @@
         .loading { pointer-events: none; opacity: 0.6; }
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
+        
+        /* Estilo para o Switch Ativo */
+        .switch-btn.active { background-color: white; color: #4f46e5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
+        .switch-btn { color: #64748b; font-weight: 500; }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800">
 
     <div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
         <div class="modal-overlay absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div>
-        
         <div class="modal-container bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]">
             <div class="py-4 px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <div class="flex items-center gap-4">
@@ -39,7 +41,6 @@
                         <p class="text-sm text-slate-500" id="modal-subtitle">Análise detalhada</p>
                     </div>
                 </div>
-                
                 <div class="flex items-center gap-3">
                     <button onclick="downloadInteractiveReport()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm shadow-sm flex items-center transition">
                         <i class="fas fa-download mr-2"></i> Baixar Relatório
@@ -61,7 +62,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 19: Análise de Evolução Semanal (Seg-Dom).</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 20: Evolução Temporal (Diário / Semanal / Mensal).</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -70,7 +71,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-calendar-week text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-calendar-alt text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) ou clique aqui</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -130,16 +131,22 @@
             </div>
 
             <div class="bg-white p-5 rounded-xl shadow-sm border border-indigo-100">
-                <div class="flex justify-between items-center mb-4">
+                <div class="flex flex-col md:flex-row justify-between items-center mb-4 gap-4">
                     <div>
                         <h4 class="font-bold text-indigo-900 text-lg flex items-center">
-                            <i class="fas fa-chart-line mr-2 text-indigo-500"></i>Evolução Semanal do Desperdício
+                            <i class="fas fa-chart-bar mr-2 text-indigo-500"></i>Evolução do Desperdício
                         </h4>
-                        <p class="text-xs text-slate-500 mt-1">Comparativo de Segunda a Domingo. <span id="weekly-trend-indicator" class="font-bold ml-2"></span></p>
+                        <p class="text-xs text-slate-500 mt-1">Comparativo de Gasto (€) ao longo do tempo. <span id="evolution-trend-indicator" class="font-bold ml-2"></span></p>
+                    </div>
+                    
+                    <div class="bg-slate-100 p-1 rounded-lg flex text-sm">
+                        <button onclick="switchEvolutionView('daily')" id="btn-daily" class="switch-btn px-4 py-1.5 rounded-md transition-all">Diário</button>
+                        <button onclick="switchEvolutionView('weekly')" id="btn-weekly" class="switch-btn active px-4 py-1.5 rounded-md transition-all">Semanal</button>
+                        <button onclick="switchEvolutionView('monthly')" id="btn-monthly" class="switch-btn px-4 py-1.5 rounded-md transition-all">Mensal</button>
                     </div>
                 </div>
                 <div class="h-72 w-full">
-                    <canvas id="weeklyChart"></canvas>
+                    <canvas id="evolutionChart"></canvas>
                 </div>
             </div>
 
@@ -148,19 +155,13 @@
                 <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos (Maior Gasto)</h4>
-                    <div class="h-64"><canvas id="productChart"></canvas></div>
-                </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm">
-                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-calendar-day mr-2 text-slate-400"></i>Detalhamento Diário (Geral)</h4>
-                    <div class="h-64"><canvas id="trendChart"></canvas></div>
-                </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm">
+                <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos (Maior Gasto)</h4>
+                <div class="h-64"><canvas id="productChart"></canvas></div>
             </div>
         </div>
 
-        <div id="results-section" class="bg-white rounded-xl shadow-sm overflow-hidden hidden">
+        <div id="results-section" class="bg-white rounded-xl shadow-sm overflow-hidden hidden mb-8">
             <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                 <h2 class="font-semibold text-slate-700 flex items-center"><i class="fas fa-search mr-2 text-slate-400"></i> Itens com Erro</h2>
                 <button onclick="downloadErrors()" id="btn-download" class="hidden bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm transition shadow items-center">
@@ -198,8 +199,12 @@
 
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {}, storeDetailsMap = {};
         let globalMinDate = null, globalMaxDate = null;
-        let productChart = null, trendChart = null, storeChart = null, modalChart = null, weeklyChart = null;
+        let productChart = null, evolutionChart = null, storeChart = null, modalChart = null;
         let currentModalStore = null;
+        
+        // Armazena dados de evolução para troca rápida
+        let evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
+        let currentEvolutionMode = 'weekly';
 
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
         const dropZone = document.getElementById('drop-zone'), fileInput = document.getElementById('file-input');
@@ -279,18 +284,15 @@
             return null;
         }
 
-        // --- HELPER DE SEMANAS ---
+        // --- HELPER DATES ---
         function getWeekLabel(date) {
             const d = new Date(date);
             const day = d.getDay();
-            const diff = d.getDate() - day + (day == 0 ? -6 : 1); // Ajusta para Segunda
+            const diff = d.getDate() - day + (day == 0 ? -6 : 1);
             const monday = new Date(d.setDate(diff));
-            const sunday = new Date(monday);
-            sunday.setDate(monday.getDate() + 6);
-            
-            const format = (dt) => dt.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+            const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6);
             return {
-                label: `${format(monday)} - ${format(sunday)}`,
+                label: `${monday.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit'})} - ${sunday.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit'})}`,
                 sortKey: monday.getTime()
             };
         }
@@ -298,8 +300,11 @@
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
             processedErrors = []; storeDetailsMap = {};
+            // Reset Data Stores
+            evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
+
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
-            let trendData = {}, storeTotalWaste = {}, productTotalWaste = {}, weeklyData = {};
+            let storeTotalWaste = {}, productTotalWaste = {};
             let errorRows = [], allValidDates = [];
 
             data.forEach(row => {
@@ -310,11 +315,22 @@
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
-                // Agregação Semanal (Valor Total)
+                // --- AGREGACAO TEMPORAL ---
                 if (date) {
+                    // Daily
+                    const dayKey = date.toISOString().split('T')[0];
+                    evolutionDataStore.daily[dayKey] = (evolutionDataStore.daily[dayKey] || 0) + val;
+                    
+                    // Weekly
                     const week = getWeekLabel(date);
-                    if (!weeklyData[week.label]) weeklyData[week.label] = { val: 0, sort: week.sortKey };
-                    weeklyData[week.label].val += val;
+                    if (!evolutionDataStore.weekly[week.label]) evolutionDataStore.weekly[week.label] = { val: 0, sort: week.sortKey };
+                    evolutionDataStore.weekly[week.label].val += val;
+
+                    // Monthly
+                    const monthKey = date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' }); // "jan. 23"
+                    const monthSort = date.getFullYear() * 100 + date.getMonth();
+                    if (!evolutionDataStore.monthly[monthKey]) evolutionDataStore.monthly[monthKey] = { val: 0, sort: monthSort };
+                    evolutionDataStore.monthly[monthKey].val += val;
                 }
 
                 const name = String(row['Item name']||"").trim(), type = String(row['Item type']||"").trim(), desc = String(row['Description']||"").trim();
@@ -334,8 +350,6 @@
 
                 if(errs.length > 0) {
                     totalErrCount++; totalErrVal += val;
-                    const trendKey = date ? date.toISOString().split('T')[0] : 'N/A';
-                    trendData[trendKey] = (trendData[trendKey] || 0) + 1;
                     errorRows.push({ dStr: date?date.toLocaleDateString('pt-PT'):"-", date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
                     processedErrors.push({ Data: date?date.toLocaleDateString('pt-PT'):"-", Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
                 }
@@ -366,7 +380,10 @@
                 document.getElementById('period-start').innerText = "--"; document.getElementById('period-end').innerText = "--";
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
-            updateMainCharts(productTotalWaste, trendData, storeTotalWaste, weeklyData);
+            
+            updateMainCharts(productTotalWaste, storeTotalWaste);
+            // Renderiza o gráfico de evolução com o modo atual (default: weekly)
+            renderEvolutionChart(currentEvolutionMode);
         }
 
         function checkMissingDates(sortedAllDates, activeStores) {
@@ -391,75 +408,78 @@
             if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        function updateMainCharts(products, trends, totalWaste, weeklyData) {
-            // TOP PRODUTOS
-            if(productChart) productChart.destroy();
-            const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10);
-            productChart = new Chart(document.getElementById('productChart'), { type: 'bar', data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
+        // --- SWITCH EVOLUÇÃO ---
+        function switchEvolutionView(mode) {
+            currentEvolutionMode = mode;
+            document.querySelectorAll('.switch-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(`btn-${mode}`).classList.add('active');
+            renderEvolutionChart(mode);
+        }
 
-            // TENDÊNCIA DIÁRIA
-            if(trendChart) trendChart.destroy();
-            const sortedDates = Object.keys(trends).sort();
-            trendChart = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: sortedDates.map(d=>d.split('-').reverse().slice(0,2).join('/')), datasets: [{ label: 'Erros', data: sortedDates.map(d=>trends[d]), borderColor: '#3b82f6', backgroundColor: '#eff6ff', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
+        function renderEvolutionChart(mode) {
+            if(evolutionChart) evolutionChart.destroy();
+            let labels = [], values = [];
 
-            // EVOLUÇÃO SEMANAL (NOVO)
-            if(weeklyChart) weeklyChart.destroy();
-            const sortedWeeks = Object.entries(weeklyData).sort((a,b) => a[1].sort - b[1].sort);
-            const weeklyLabels = sortedWeeks.map(x => x[0]);
-            const weeklyValues = sortedWeeks.map(x => x[1].val);
-            
+            if (mode === 'daily') {
+                const sortedKeys = Object.keys(evolutionDataStore.daily).sort();
+                labels = sortedKeys.map(k => k.split('-').reverse().slice(0,2).join('/')); // DD/MM
+                values = sortedKeys.map(k => evolutionDataStore.daily[k]);
+            } else if (mode === 'weekly') {
+                const sortedEntries = Object.entries(evolutionDataStore.weekly).sort((a,b) => a[1].sort - b[1].sort);
+                labels = sortedEntries.map(e => e[0]);
+                values = sortedEntries.map(e => e[1].val);
+            } else if (mode === 'monthly') {
+                const sortedEntries = Object.entries(evolutionDataStore.monthly).sort((a,b) => a[1].sort - b[1].sort);
+                labels = sortedEntries.map(e => e[0]);
+                values = sortedEntries.map(e => e[1].val);
+            }
+
             // Indicador de Tendência
-            const ind = document.getElementById('weekly-trend-indicator');
-            if (weeklyValues.length >= 2) {
-                const last = weeklyValues[weeklyValues.length-1];
-                const prev = weeklyValues[weeklyValues.length-2];
+            const ind = document.getElementById('evolution-trend-indicator');
+            if (values.length >= 2) {
+                const last = values[values.length-1];
+                const prev = values[values.length-2];
                 const diff = last - prev;
-                const icon = diff > 0 ? "⬆️ Aumento" : "⬇️ Queda";
+                const icon = diff > 0 ? "⬆️" : "⬇️";
                 const color = diff > 0 ? "text-red-500" : "text-green-500";
                 ind.innerHTML = `<span class="${color}">${icon} (€ ${Math.abs(diff).toFixed(0)})</span>`;
             } else {
                 ind.innerHTML = "";
             }
 
-            weeklyChart = new Chart(document.getElementById('weeklyChart'), {
-                type: 'line',
+            const ctx = document.getElementById('evolutionChart');
+            evolutionChart = new Chart(ctx, {
+                type: 'bar',
                 data: {
-                    labels: weeklyLabels,
+                    labels: labels,
                     datasets: [{
-                        label: 'Desperdício Semanal (€)',
-                        data: weeklyValues,
-                        borderColor: '#6366f1', // Indigo
-                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                        borderWidth: 2,
-                        fill: true,
-                        tension: 0.3,
-                        pointBackgroundColor: '#fff',
-                        pointBorderColor: '#6366f1',
-                        pointRadius: 5
+                        label: 'Gasto (€)',
+                        data: values,
+                        backgroundColor: '#6366f1',
+                        borderRadius: 4
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } }
-                    },
-                    scales: {
-                        y: { beginAtZero: true, grid: { color: '#f1f5f9' } },
-                        x: { grid: { display: false } }
-                    }
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } },
+                    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
                 }
             });
+        }
 
-            // LOJAS
+        function updateMainCharts(products, totalWaste) {
+            if(productChart) productChart.destroy();
+            const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10);
+            productChart = new Chart(document.getElementById('productChart'), { type: 'bar', data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
+
             if(storeChart) storeChart.destroy();
             const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
             storeChart = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- LÓGICA DO MODAL & DOWNLOAD OFFLINE ---
+        // --- MODAL ---
         function openModal(storeName) {
             currentModalStore = storeName;
             document.getElementById('modal-title').innerText = storeName;
