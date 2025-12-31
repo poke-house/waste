@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V20 (Evolução Temporal Completa)</title>
+    <title>Dashboard Desperdícios - V21 (Drill-down Temporal)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -20,8 +20,6 @@
         .loading { pointer-events: none; opacity: 0.6; }
         .modal { transition: opacity 0.25s ease; }
         body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
-        
-        /* Estilo para o Switch Ativo */
         .switch-btn.active { background-color: white; color: #4f46e5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
         .switch-btn { color: #64748b; font-weight: 500; }
     </style>
@@ -33,12 +31,12 @@
         <div class="modal-container bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]">
             <div class="py-4 px-6 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
                 <div class="flex items-center gap-4">
-                    <button id="btn-back-level" onclick="backToStoreLevel()" class="hidden bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1 rounded-md text-sm shadow-sm transition">
+                    <button id="btn-back-level" onclick="backToMainLevel()" class="hidden bg-white border border-slate-300 text-slate-600 hover:bg-slate-100 px-3 py-1 rounded-md text-sm shadow-sm transition">
                         <i class="fas fa-arrow-left mr-1"></i> Voltar
                     </button>
                     <div>
-                        <p class="text-2xl font-bold text-slate-800" id="modal-title">Loja</p>
-                        <p class="text-sm text-slate-500" id="modal-subtitle">Análise detalhada</p>
+                        <p class="text-2xl font-bold text-slate-800" id="modal-title">Título</p>
+                        <p class="text-sm text-slate-500" id="modal-subtitle">Subtítulo</p>
                     </div>
                 </div>
                 <div class="flex items-center gap-3">
@@ -62,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 20: Evolução Temporal (Diário / Semanal / Mensal).</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 21: Drill-down nos Gráficos de Tempo e Loja.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -71,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-calendar-alt text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-calendar-check text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) ou clique aqui</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -95,7 +93,6 @@
         </div>
 
         <div id="dashboard-content" class="hidden space-y-6 mb-6">
-            
             <div class="bg-indigo-900 text-white p-4 rounded-xl shadow-md flex flex-col md:flex-row justify-between items-center">
                 <div class="flex items-center space-x-3">
                     <div class="bg-indigo-700 p-2 rounded-lg"><i class="far fa-calendar-alt text-xl"></i></div>
@@ -136,16 +133,15 @@
                         <h4 class="font-bold text-indigo-900 text-lg flex items-center">
                             <i class="fas fa-chart-bar mr-2 text-indigo-500"></i>Evolução do Desperdício
                         </h4>
-                        <p class="text-xs text-slate-500 mt-1">Comparativo de Gasto (€) ao longo do tempo. <span id="evolution-trend-indicator" class="font-bold ml-2"></span></p>
+                        <p class="text-xs text-slate-400 mt-1">Clique nas barras para ver quais produtos causaram o pico neste período.</p>
                     </div>
-                    
                     <div class="bg-slate-100 p-1 rounded-lg flex text-sm">
                         <button onclick="switchEvolutionView('daily')" id="btn-daily" class="switch-btn px-4 py-1.5 rounded-md transition-all">Diário</button>
                         <button onclick="switchEvolutionView('weekly')" id="btn-weekly" class="switch-btn active px-4 py-1.5 rounded-md transition-all">Semanal</button>
                         <button onclick="switchEvolutionView('monthly')" id="btn-monthly" class="switch-btn px-4 py-1.5 rounded-md transition-all">Mensal</button>
                     </div>
                 </div>
-                <div class="h-72 w-full">
+                <div class="h-72 w-full cursor-pointer">
                     <canvas id="evolutionChart"></canvas>
                 </div>
             </div>
@@ -155,9 +151,15 @@
                 <div class="h-96 cursor-pointer"><canvas id="storeChart"></canvas></div>
             </div>
 
-            <div class="bg-white p-5 rounded-xl shadow-sm">
-                <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos (Maior Gasto)</h4>
-                <div class="h-64"><canvas id="productChart"></canvas></div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div class="bg-white p-5 rounded-xl shadow-sm">
+                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-box-open mr-2 text-slate-400"></i>Top 10 Produtos (Maior Gasto)</h4>
+                    <div class="h-64"><canvas id="productChart"></canvas></div>
+                </div>
+                <div class="bg-white p-5 rounded-xl shadow-sm">
+                    <h4 class="font-bold text-slate-700 mb-4 text-sm"><i class="fas fa-chart-line mr-2 text-slate-400"></i>Tendência de Erros</h4>
+                    <div class="h-64"><canvas id="trendChart"></canvas></div>
+                </div>
             </div>
         </div>
 
@@ -200,11 +202,11 @@
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {}, storeDetailsMap = {};
         let globalMinDate = null, globalMaxDate = null;
         let productChart = null, evolutionChart = null, storeChart = null, modalChart = null;
-        let currentModalStore = null;
-        
-        // Armazena dados de evolução para troca rápida
         let evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
         let currentEvolutionMode = 'weekly';
+        
+        // Modal State
+        let currentModalContext = { title: "", items: [] };
 
         window.onload = () => { if(typeof XLSX === 'undefined') document.getElementById('error-msg-box').classList.remove('hidden'); };
         const dropZone = document.getElementById('drop-zone'), fileInput = document.getElementById('file-input');
@@ -284,7 +286,6 @@
             return null;
         }
 
-        // --- HELPER DATES ---
         function getWeekLabel(date) {
             const d = new Date(date);
             const day = d.getDay();
@@ -300,11 +301,10 @@
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
             processedErrors = []; storeDetailsMap = {};
-            // Reset Data Stores
             evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
 
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
-            let storeTotalWaste = {}, productTotalWaste = {};
+            let trendData = {}, storeTotalWaste = {}, productTotalWaste = {};
             let errorRows = [], allValidDates = [];
 
             data.forEach(row => {
@@ -315,19 +315,14 @@
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
 
-                // --- AGREGACAO TEMPORAL ---
+                // Aggregation for Evolution Chart (All Data, not just errors)
                 if (date) {
-                    // Daily
                     const dayKey = date.toISOString().split('T')[0];
                     evolutionDataStore.daily[dayKey] = (evolutionDataStore.daily[dayKey] || 0) + val;
-                    
-                    // Weekly
                     const week = getWeekLabel(date);
                     if (!evolutionDataStore.weekly[week.label]) evolutionDataStore.weekly[week.label] = { val: 0, sort: week.sortKey };
                     evolutionDataStore.weekly[week.label].val += val;
-
-                    // Monthly
-                    const monthKey = date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' }); // "jan. 23"
+                    const monthKey = date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' });
                     const monthSort = date.getFullYear() * 100 + date.getMonth();
                     if (!evolutionDataStore.monthly[monthKey]) evolutionDataStore.monthly[monthKey] = { val: 0, sort: monthSort };
                     evolutionDataStore.monthly[monthKey].val += val;
@@ -337,7 +332,17 @@
                 if (name) productTotalWaste[name] = (productTotalWaste[name] || 0) + val;
 
                 if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
-                storeDetailsMap[buyer].push({ dateStr: date ? date.toISOString().split('T')[0] : null, name, val });
+                // Store raw item data for drill down
+                const itemObj = { 
+                    dateObj: date, 
+                    dateStr: date ? date.toISOString().split('T')[0] : null, 
+                    name, val, type, desc,
+                    // Pre-calculate date formats for period matching
+                    dayKey: date ? date.toISOString().split('T')[0] : null,
+                    weekLabel: date ? getWeekLabel(date).label : null,
+                    monthLabel: date ? date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' }) : null
+                };
+                storeDetailsMap[buyer].push(itemObj);
 
                 let errs = [];
                 if(name.toUpperCase().includes("CPK")) errs.push("Nome contém 'CPK'");
@@ -350,6 +355,8 @@
 
                 if(errs.length > 0) {
                     totalErrCount++; totalErrVal += val;
+                    const trendKey = date ? date.toISOString().split('T')[0] : 'N/A';
+                    trendData[trendKey] = (trendData[trendKey] || 0) + 1;
                     errorRows.push({ dStr: date?date.toLocaleDateString('pt-PT'):"-", date, buyer, name, type, desc, val, errs, am: storeToAMMap[buyer]||"?" });
                     processedErrors.push({ Data: date?date.toLocaleDateString('pt-PT'):"-", Loja: buyer, AM: storeToAMMap[buyer], Item: name, Erro: errs.join(" | ") });
                 }
@@ -380,9 +387,7 @@
                 document.getElementById('period-start').innerText = "--"; document.getElementById('period-end').innerText = "--";
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
-            
-            updateMainCharts(productTotalWaste, storeTotalWaste);
-            // Renderiza o gráfico de evolução com o modo atual (default: weekly)
+            updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
             renderEvolutionChart(currentEvolutionMode);
         }
 
@@ -408,7 +413,6 @@
             if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        // --- SWITCH EVOLUÇÃO ---
         function switchEvolutionView(mode) {
             currentEvolutionMode = mode;
             document.querySelectorAll('.switch-btn').forEach(btn => btn.classList.remove('active'));
@@ -418,33 +422,22 @@
 
         function renderEvolutionChart(mode) {
             if(evolutionChart) evolutionChart.destroy();
-            let labels = [], values = [];
+            let labels = [], values = [], rawKeys = [];
 
             if (mode === 'daily') {
-                const sortedKeys = Object.keys(evolutionDataStore.daily).sort();
-                labels = sortedKeys.map(k => k.split('-').reverse().slice(0,2).join('/')); // DD/MM
-                values = sortedKeys.map(k => evolutionDataStore.daily[k]);
+                rawKeys = Object.keys(evolutionDataStore.daily).sort();
+                labels = rawKeys.map(k => k.split('-').reverse().slice(0,2).join('/'));
+                values = rawKeys.map(k => evolutionDataStore.daily[k]);
             } else if (mode === 'weekly') {
                 const sortedEntries = Object.entries(evolutionDataStore.weekly).sort((a,b) => a[1].sort - b[1].sort);
                 labels = sortedEntries.map(e => e[0]);
+                rawKeys = labels; // For weekly, the label is the key
                 values = sortedEntries.map(e => e[1].val);
             } else if (mode === 'monthly') {
                 const sortedEntries = Object.entries(evolutionDataStore.monthly).sort((a,b) => a[1].sort - b[1].sort);
                 labels = sortedEntries.map(e => e[0]);
+                rawKeys = labels;
                 values = sortedEntries.map(e => e[1].val);
-            }
-
-            // Indicador de Tendência
-            const ind = document.getElementById('evolution-trend-indicator');
-            if (values.length >= 2) {
-                const last = values[values.length-1];
-                const prev = values[values.length-2];
-                const diff = last - prev;
-                const icon = diff > 0 ? "⬆️" : "⬇️";
-                const color = diff > 0 ? "text-red-500" : "text-green-500";
-                ind.innerHTML = `<span class="${color}">${icon} (€ ${Math.abs(diff).toFixed(0)})</span>`;
-            } else {
-                ind.innerHTML = "";
             }
 
             const ctx = document.getElementById('evolutionChart');
@@ -460,53 +453,107 @@
                     }]
                 },
                 options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    responsive: true, maintainAspectRatio: false,
                     plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } },
-                    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }
+                    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+                    // CLICK EVENT FOR TIME PERIOD
+                    onClick: (evt, activeElements) => {
+                        if (activeElements.length > 0) {
+                            const idx = activeElements[0].index;
+                            const label = rawKeys[idx]; // Use raw key for filtering
+                            openPeriodModal(label, mode);
+                        }
+                    },
+                    onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
                 }
             });
         }
 
-        function updateMainCharts(products, totalWaste) {
+        function updateMainCharts(products, trends, totalWaste) {
             if(productChart) productChart.destroy();
             const sortedProducts = Object.entries(products).sort((a,b) => b[1]-a[1]).slice(0, 10);
             productChart = new Chart(document.getElementById('productChart'), { type: 'bar', data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, options: { indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
 
+            if(trendChart) trendChart.destroy();
+            const sortedDates = Object.keys(trends).sort();
+            trendChart = new Chart(document.getElementById('trendChart'), { type: 'line', data: { labels: sortedDates.map(d=>d.split('-').reverse().slice(0,2).join('/')), datasets: [{ label: 'Erros', data: sortedDates.map(d=>trends[d]), borderColor: '#3b82f6', backgroundColor: '#eff6ff', fill: true, tension: 0.3 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } } });
+
             if(storeChart) storeChart.destroy();
             const sortedStores = Object.entries(totalWaste).sort((a,b) => b[1]-a[1]);
             const barColors = sortedStores.map(entry => amHexColors[storeToAMMap[entry[0]] || "Outros"] || "#64748b");
-            storeChart = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
+            storeChart = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openStoreModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- MODAL ---
-        function openModal(storeName) {
-            currentModalStore = storeName;
-            document.getElementById('modal-title').innerText = storeName;
-            document.getElementById('modal-subtitle').innerText = "Produtos por maior desperdício (Semáforo)";
+        // --- GENERIC MODAL LOGIC ---
+        function openGenericModal(title, subtitle, items, contextKey) {
+            currentModalContext = { title, subtitle, items }; // Store context for download
+            document.getElementById('modal-title').innerText = title;
+            document.getElementById('modal-subtitle').innerText = subtitle;
             document.getElementById('btn-back-level').classList.add('hidden');
             document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none');
             document.body.classList.add('modal-active');
 
-            const rawItems = storeDetailsMap[storeName] || [];
-            const productAggregation = {};
-            rawItems.forEach(item => productAggregation[item.name] = (productAggregation[item.name] || 0) + item.val);
-            const sortedProducts = Object.entries(productAggregation).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
-            const totalItems = sortedProducts.length;
-            const bgColors = sortedProducts.map((_, index) => index < totalItems / 3 ? '#ef4444' : (index < (totalItems * 2) / 3 ? '#eab308' : '#22c55e'));
+            // Aggregate by Product
+            const agg = {};
+            items.forEach(item => agg[item.name] = (agg[item.name] || 0) + item.val);
+            const sorted = Object.entries(agg).map(([name, total]) => ({ name, total })).sort((a, b) => b.total - a.total);
+            
+            // Colors
+            const totalItems = sorted.length;
+            const bgColors = sorted.map((_, index) => index < totalItems / 3 ? '#ef4444' : (index < (totalItems * 2) / 3 ? '#eab308' : '#22c55e'));
 
             if(modalChart) modalChart.destroy();
             const ctx = document.getElementById('modalChart').getContext('2d');
-            modalChart = new Chart(ctx, { type: 'bar', data: { labels: sortedProducts.map(p => p.name), datasets: [{ label: 'Desperdício (€)', data: sortedProducts.map(p => p.total), backgroundColor: bgColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', scales: { x: { beginAtZero: true } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `€ ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) showProductDailyDetails(sortedProducts[activeElements[0].index].name); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
+            modalChart = new Chart(ctx, { 
+                type: 'bar', 
+                data: { labels: sorted.map(p => p.name), datasets: [{ label: 'Valor (€)', data: sorted.map(p => p.total), backgroundColor: bgColors, borderRadius: 4 }] }, 
+                options: { 
+                    responsive: true, maintainAspectRatio: false, indexAxis: 'y', 
+                    scales: { x: { beginAtZero: true } }, 
+                    plugins: { legend: { display: false } },
+                    onClick: (evt, activeElements) => { 
+                        if (activeElements.length > 0) showModalDrillDown(sorted[activeElements[0].index].name, items); 
+                    },
+                    onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
+                } 
+            });
         }
 
-        function showProductDailyDetails(productName) {
+        function openStoreModal(storeName) {
+            const items = storeDetailsMap[storeName] || [];
+            openGenericModal(storeName, "Ranking de Produtos (Semáforo)", items);
+        }
+
+        function openPeriodModal(periodKey, mode) {
+            // Filter all items from all stores to find those matching the period
+            let filteredItems = [];
+            const allStoreKeys = Object.keys(storeDetailsMap);
+            
+            allStoreKeys.forEach(store => {
+                const storeItems = storeDetailsMap[store];
+                storeItems.forEach(item => {
+                    let match = false;
+                    if (mode === 'daily') match = (item.dayKey === periodKey);
+                    else if (mode === 'weekly') match = (item.weekLabel === periodKey);
+                    else if (mode === 'monthly') match = (item.monthLabel === periodKey);
+                    
+                    if (match) filteredItems.push(item);
+                });
+            });
+            openGenericModal(periodKey, "Produtos com maior impacto neste período", filteredItems);
+        }
+
+        function showModalDrillDown(productName, contextItems) {
             document.getElementById('modal-title').innerText = productName;
-            document.getElementById('modal-subtitle').innerText = "Evolução diária na " + currentModalStore;
+            document.getElementById('modal-subtitle').innerText = "Evolução diária (Contexto Atual)";
             document.getElementById('btn-back-level').classList.remove('hidden');
-            const allItems = storeDetailsMap[currentModalStore] || [];
+            
+            const productItems = contextItems.filter(i => i.name === productName);
             const dateValueMap = {};
-            allItems.filter(i => i.name === productName).forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
+            productItems.forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
+
+            // Generate labels range based on actual data present or global range? 
+            // Global range is better for context.
             const labels = [], dataValues = [];
             if (globalMinDate && globalMaxDate) {
                 for (let d = new Date(globalMinDate); d <= globalMaxDate; d.setDate(d.getDate() + 1)) {
@@ -515,113 +562,63 @@
                     dataValues.push(dateValueMap[iso] || 0); 
                 }
             }
+
             if(modalChart) modalChart.destroy();
             const ctx = document.getElementById('modalChart').getContext('2d');
-            modalChart = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Desperdício (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x', scales: { y: { beginAtZero: true } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (context) => context.raw === 0 ? "(Sem desperdício)" : `€ ${context.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } } } });
+            modalChart = new Chart(ctx, { 
+                type: 'bar', 
+                data: { labels: labels, datasets: [{ label: 'Valor (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }] }, 
+                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x' } 
+            });
         }
 
-        function backToStoreLevel() { if (currentModalStore) openModal(currentModalStore); }
-        function closeModal() { document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); currentModalStore = null; }
+        function backToMainLevel() {
+            // Restore original view based on current context
+            openGenericModal(currentModalContext.title, currentModalContext.subtitle, currentModalContext.items);
+        }
+
+        function closeModal() { document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); }
         
         function downloadInteractiveReport() {
-            if (!currentModalStore) return;
-            const items = storeDetailsMap[currentModalStore] || [];
+            const items = currentModalContext.items || [];
+            const title = currentModalContext.title;
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
             const minD = globalMinDate ? globalMinDate.toISOString() : null;
             const maxD = globalMaxDate ? globalMaxDate.toISOString() : null;
 
             const htmlContent = `
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Relatório - ${currentModalStore}</title>
-<script src="https://cdn.tailwindcss.com"><\/script>
-<script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script>
-<style>body{font-family:'Segoe UI',sans-serif;background-color:#f8fafc}.custom-scroll::-webkit-scrollbar{width:6px}.custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}</style>
-</head>
-<body class="p-6 text-slate-800">
-<div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-<div class="bg-slate-800 text-white p-6 flex justify-between items-center">
-<div><h1 class="text-2xl font-bold">${currentModalStore}</h1><p class="text-slate-300 text-sm">Relatório de Desperdício (${pStart} até ${pEnd})</p></div>
-<button onclick="window.print()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm"><i class="fas fa-print"></i> Imprimir</button>
-</div>
-<div class="p-6">
-<div class="flex justify-between items-center mb-4">
-<button id="btn-back" onclick="renderProductView()" class="hidden text-sm bg-gray-100 hover:bg-gray-200 px-3 py-1 rounded text-slate-600 font-bold">&larr; Voltar para Produtos</button>
-<h2 id="chart-title" class="text-lg font-bold text-slate-700">Ranking de Produtos</h2>
-</div>
-<div class="relative h-[500px] w-full"><canvas id="mainChart"></canvas></div>
-</div>
-</div>
-<script>
-const rawData = ${JSON.stringify(items)};
-const minDateStr = "${minD}"; const maxDateStr = "${maxD}";
-let chartInstance = null;
-
-function renderProductView() {
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório - ${title}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script></head><body class="p-6 text-slate-800"><div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">${title}</h1><p class="text-slate-300 text-sm">Relatório (${pStart} - ${pEnd})</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded">Imprimir</button></div><div class="p-6"><button id="btn-back" onclick="renderView()" class="hidden mb-4 bg-gray-200 px-3 py-1 rounded">Voltar</button><div class="h-[500px]"><canvas id="mainChart"></canvas></div></div></div><script>
+const rawData=${JSON.stringify(items)}, minD="${minD}", maxD="${maxD}"; let chart=null;
+function renderView(){
     document.getElementById('btn-back').classList.add('hidden');
-    document.getElementById('chart-title').innerText = "Ranking de Produtos por Custo (Semáforo)";
-    const agg = {}; rawData.forEach(i => agg[i.name] = (agg[i.name]||0) + i.val);
-    const sorted = Object.entries(agg).map(([n,v])=>({name:n, val:v})).sort((a,b)=>b.val-a.val);
-    const total = sorted.length;
-    const colors = sorted.map((_,i) => i < total/3 ? '#ef4444' : (i < (total*2)/3 ? '#eab308' : '#22c55e'));
-    if(chartInstance) chartInstance.destroy();
-    const ctx = document.getElementById('mainChart').getContext('2d');
-    chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: colors, borderRadius: 4 }] },
-        options: {
-            indexAxis: 'y', responsive: true, maintainAspectRatio: false,
-            plugins: { legend: {display:false}, tooltip: {callbacks: {label: (c)=> '€ '+c.raw.toFixed(2)}} },
-            onClick: (e, el) => { if(el.length) renderDailyView(sorted[el[0].index].name); },
-            onHover: (e, el) => e.native.target.style.cursor = el[0]?'pointer':'default'
-        }
-    });
+    const agg={}; rawData.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val);
+    const sorted=Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val);
+    const cols=sorted.map((_,i)=>i<sorted.length/3?'#ef4444':(i<sorted.length*2/3?'#eab308':'#22c55e'));
+    if(chart)chart.destroy();
+    chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:sorted.map(x=>x.name),datasets:[{label:'€',data:sorted.map(x=>x.val),backgroundColor:cols}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el.length)renderDaily(sorted[el[0].index].name)}}});
 }
-
-function renderDailyView(prodName) {
+function renderDaily(name){
     document.getElementById('btn-back').classList.remove('hidden');
-    document.getElementById('chart-title').innerText = "Evolução Diária: " + prodName;
-    const prodItems = rawData.filter(i => i.name === prodName);
-    const dateMap = {}; prodItems.forEach(i => { if(i.dateStr) dateMap[i.dateStr] = (dateMap[i.dateStr]||0) + i.val; });
-    const labels = [], data = [];
-    if(minDateStr && maxDateStr) {
-        const dCurrent = new Date(minDateStr); const dEnd = new Date(maxDateStr);
-        while(dCurrent <= dEnd) {
-            const iso = dCurrent.toISOString().split('T')[0];
-            labels.push(dCurrent.toLocaleDateString('pt-PT').slice(0,5));
-            data.push(dateMap[iso] || 0);
-            dCurrent.setDate(dCurrent.getDate() + 1);
-        }
-    }
-    if(chartInstance) chartInstance.destroy();
-    chartInstance = new Chart(document.getElementById('mainChart'), {
-        type: 'bar',
-        data: { labels: labels, datasets: [{ label: 'Gasto (€)', data: data, backgroundColor: '#3b82f6' }] },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} } }
-    });
+    const dMap={}; rawData.filter(i=>i.name===name).forEach(i=>{if(i.dateStr)dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val});
+    const lbl=[],dat=[];
+    if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const iso=cur.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}}
+    if(chart)chart.destroy();
+    chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:lbl,datasets:[{label:'€',data:dat,backgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false}});
 }
-renderProductView();
+renderView();
 <\/script></body></html>`;
+            
             const blob = new Blob([htmlContent], { type: "text/html" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = `Relatorio_${currentModalStore.replace(/[^a-z0-9]/gi, '_')}.html`;
+            a.download = `Relatorio_${title.replace(/[^a-z0-9]/gi, '_')}.html`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         }
 
-        function downloadErrors() {
-            if (processedErrors.length === 0) return;
-            const ws = XLSX.utils.json_to_sheet(processedErrors);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Erros");
-            XLSX.writeFile(wb, "Relatorio_Erros_Auditados.xlsx");
-        }
         document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
     </script>
 </body>
