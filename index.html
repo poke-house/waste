@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V24 (Regra Preparation)</title>
+    <title>Dashboard Desperdícios - V25 (Correção RFU/Preparation)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -60,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 24: Nova regra para 'Preparation' (Exige End of Day).</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 25: Correção de Conflito RFU vs Preparation.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -69,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-check-double text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-check-circle text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .xls, .csv)</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -351,18 +351,25 @@
                 let errs = [];
                 if(name.toUpperCase().includes("CPK")) errs.push("Nome contém 'CPK'");
                 
-                // ATUALIZAÇÃO V24: Adicionado 'preparation'
                 const validTypes = ["purchase", "sub-recipe", "inventory item", "preparation"];
                 if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 
-                // ATUALIZAÇÃO V24: Regra Preparation
+                // REGRA PREPARATION
                 if (type.toLowerCase() === "preparation" && desc.toLowerCase() !== "end of day") {
                     errs.push("PREPARATION deve ser 'End of Day'");
                 }
 
+                // CORREÇÃO RFU V25
                 if(name.toUpperCase().includes("RFU")) {
-                    if(type.toLowerCase() !== "sub-recipe") errs.push("RFU deve ser Sub-recipe");
-                    else if(desc.toLowerCase() !== "end of day" && !desc.toLowerCase().includes("expired") && !desc.toLowerCase().includes("spoiled")) errs.push("RFU deve ser 'End of Day' ou 'Expired/Spoiled'");
+                    if (type.toLowerCase() !== "sub-recipe" && type.toLowerCase() !== "preparation") {
+                        errs.push("RFU deve ser Sub-recipe ou Preparation");
+                    } else if (type.toLowerCase() === "sub-recipe") {
+                        // Se for Sub-recipe, aplica a regra de description
+                        if (desc.toLowerCase() !== "end of day" && !desc.toLowerCase().includes("expired") && !desc.toLowerCase().includes("spoiled")) {
+                            errs.push("RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'");
+                        }
+                    }
+                    // Se for Preparation, a regra de "Preparation" acima já valida o End of Day
                 }
 
                 if(errs.length > 0) {
@@ -611,21 +618,11 @@ renderView();
 
         // --- FUNÇÃO DE DOWNLOAD DO GRUPO (V23) ---
         function downloadGroupReport() {
-            // Filtrar itens ativos com base nos checkboxes
             const activeCheckboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
-            // Pegar todos os itens do storeDetailsMap que correspondem aos checkboxes ativos
             let groupItems = {};
-            activeCheckboxes.forEach(store => {
-                if (storeDetailsMap[store]) {
-                    groupItems[store] = storeDetailsMap[store];
-                }
-            });
+            activeCheckboxes.forEach(store => { if (storeDetailsMap[store]) groupItems[store] = storeDetailsMap[store]; });
 
-            // Se nenhum item, alertar
-            if (Object.keys(groupItems).length === 0) {
-                alert("Nenhuma loja selecionada ou sem dados.");
-                return;
-            }
+            if (Object.keys(groupItems).length === 0) { alert("Nenhuma loja selecionada ou sem dados."); return; }
 
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
@@ -642,8 +639,7 @@ renderView();
 <script>
 const groupData=${JSON.stringify(groupItems)}, minD="${minD}", maxD="${maxD}"; let mainChart=null, modalChart=null, currentStoreName=null;
 function initMainChart(){
-    const aggStores={}; 
-    Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); });
+    const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); });
     const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]);
     const ctx = document.getElementById('mainChart').getContext('2d');
     mainChart = new Chart(ctx, {
@@ -658,13 +654,11 @@ function openStoreModal(storeName){
     document.getElementById('btn-back-level').classList.add('hidden');
     document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none');
     document.body.classList.add('modal-active');
-    
     const items = groupData[storeName] || [];
     const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val);
     const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val);
     const total = sorted.length;
     const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e'));
-
     if(modalChart) modalChart.destroy();
     const ctx = document.getElementById('modalChart').getContext('2d');
     modalChart = new Chart(ctx, { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } });
@@ -682,7 +676,6 @@ function showDaily(prodName){
 function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); }
 initMainChart();
 <\/script></body></html>`;
-            
             const blob = new Blob([htmlContent], { type: "text/html" });
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
