@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V25 (Correção RFU/Preparation)</title>
+    <title>Dashboard Desperdícios - V26 (Precisão Total)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -60,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 25: Correção de Conflito RFU vs Preparation.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 26: Controle de Precisão de Datas.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -69,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-check-circle text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-search-plus text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .xls, .csv)</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -108,6 +108,7 @@
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500 flex justify-between items-center">
                     <div>
                         <p class="text-xs text-red-400 uppercase font-bold">Lançamentos Errados</p>
@@ -116,10 +117,25 @@
                     </div>
                     <i class="fas fa-times-circle text-red-100 text-3xl"></i>
                 </div>
-                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-400 col-span-2 flex flex-col">
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-yellow-400 flex flex-col justify-center">
+                    <div class="flex justify-between items-center mb-1">
+                        <p class="text-xs text-yellow-600 uppercase font-bold">Lojas com Lançamento Zero</p>
+                        <i class="fas fa-search-dollar text-yellow-200 text-2xl"></i>
+                    </div>
+                    <div class="bg-yellow-50 rounded text-[10px] text-yellow-900 overflow-y-auto h-16 custom-scroll p-2 border border-yellow-100" id="zero-value-log">
+                        <p class="text-center italic text-slate-400">Nenhuma loja zerada.</p>
+                    </div>
+                </div>
+
+                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
-                        <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes</p>
-                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual ignorado</span>
+                        <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Dias Faltantes</p>
+                        
+                        <label class="flex items-center space-x-2 text-[10px] bg-slate-100 px-2 py-1 rounded cursor-pointer select-none border border-slate-200">
+                            <input type="checkbox" id="check-today" onchange="applyFilters()" class="text-indigo-600 rounded focus:ring-indigo-500 h-3 w-3">
+                            <span class="text-slate-600 font-bold">Incluir dia de hoje?</span>
+                        </label>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
                         <p class="text-center italic text-slate-400 mt-4">Processando...</p>
@@ -354,22 +370,18 @@
                 const validTypes = ["purchase", "sub-recipe", "inventory item", "preparation"];
                 if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 
-                // REGRA PREPARATION
                 if (type.toLowerCase() === "preparation" && desc.toLowerCase() !== "end of day") {
                     errs.push("PREPARATION deve ser 'End of Day'");
                 }
 
-                // CORREÇÃO RFU V25
                 if(name.toUpperCase().includes("RFU")) {
                     if (type.toLowerCase() !== "sub-recipe" && type.toLowerCase() !== "preparation") {
                         errs.push("RFU deve ser Sub-recipe ou Preparation");
                     } else if (type.toLowerCase() === "sub-recipe") {
-                        // Se for Sub-recipe, aplica a regra de description
                         if (desc.toLowerCase() !== "end of day" && !desc.toLowerCase().includes("expired") && !desc.toLowerCase().includes("spoiled")) {
                             errs.push("RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'");
                         }
                     }
-                    // Se for Preparation, a regra de "Preparation" acima já valida o End of Day
                 }
 
                 if(errs.length > 0) {
@@ -408,10 +420,31 @@
             }
             updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
             renderEvolutionChart(currentEvolutionMode);
+            checkZeroValueStores(storeTotalWaste, activeStores);
         }
 
+        // --- CHECK LOJAS ZERADAS ---
+        function checkZeroValueStores(storeTotalWaste, activeStores) {
+            const zeroLog = document.getElementById('zero-value-log');
+            zeroLog.innerHTML = '';
+            let hasZero = false;
+            activeStores.forEach(store => {
+                if (storeTotalWaste[store] !== undefined && storeTotalWaste[store] === 0) {
+                    hasZero = true;
+                    zeroLog.innerHTML += `<div class="mb-1 border-b border-yellow-200 pb-1 last:border-0 text-xs text-yellow-800"><strong>${store}</strong>: Lançou € 0,00</div>`;
+                }
+            });
+            if (!hasZero) zeroLog.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Tudo OK</div>';
+        }
+
+        // --- CHECK DIAS FALTANTES (ATUALIZADO) ---
         function checkMissingDates(sortedAllDates, activeStores) {
-            const min = sortedAllDates[0], max = sortedAllDates[sortedAllDates.length-1], todayISO = new Date().toISOString().split('T')[0];
+            const min = sortedAllDates[0], max = sortedAllDates[sortedAllDates.length-1];
+            // Lógica do Dia Atual
+            const today = new Date();
+            const todayISO = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            const includeToday = document.getElementById('check-today').checked;
+
             const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
@@ -422,7 +455,10 @@
                 let missing = [];
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
                     const iso = d.toISOString().split('T')[0];
-                    if (iso !== todayISO && !storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
+                    // Se a data do loop for hoje e a checkbox NÃO estiver marcada, pula
+                    if (iso === todayISO && !includeToday) continue;
+
+                    if(!storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                 }
                 if(missing.length > 0) {
                     hasMissing = true;
