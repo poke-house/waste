@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V25 (Correção RFU/Preparation)</title>
+    <title>Dashboard Desperdícios - V28 (Seletor de Datas)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -60,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 25: Correção de Conflito RFU vs Preparation.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 28: Seleção de Datas para Auditoria.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -69,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-check-circle text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-calendar-alt text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .xls, .csv)</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -79,10 +79,23 @@
 
         <div id="filter-section" class="hidden mb-6">
             <div class="bg-white p-5 rounded-xl shadow-sm">
-                <div class="flex flex-wrap justify-between items-center mb-4 pb-3 border-b border-slate-100">
-                    <h3 class="font-bold text-slate-700 flex items-center"><i class="fas fa-users mr-2 text-blue-500"></i>Filtro por Area Manager</h3>
+                <div class="flex flex-wrap justify-between items-end mb-4 pb-4 border-b border-slate-100 gap-4">
+                    <div class="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Data Início</label>
+                            <input type="date" id="filter-start-date" onchange="applyFilters()" class="border border-slate-300 rounded px-2 py-1 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-bold text-slate-500 mb-1">Data Fim</label>
+                            <input type="date" id="filter-end-date" onchange="applyFilters()" class="border border-slate-300 rounded px-2 py-1 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div class="flex items-end">
+                            <span class="text-xs text-slate-400 italic mb-1.5">* Se vazio, usa datas do arquivo.</span>
+                        </div>
+                    </div>
+
                     <div class="space-x-3 text-sm">
-                        <button onclick="toggleGlobal(true)" class="text-blue-600 hover:text-blue-800 font-medium">Todos</button>
+                        <button onclick="toggleGlobal(true)" class="text-blue-600 hover:text-blue-800 font-medium">Todos AMs</button>
                         <span class="text-slate-300">|</span>
                         <button onclick="toggleGlobal(false)" class="text-slate-500 hover:text-slate-700">Nenhum</button>
                         <button onclick="applyFilters()" class="ml-4 bg-blue-600 hover:bg-blue-700 text-white px-5 py-1.5 rounded shadow-sm transition">Atualizar</button>
@@ -119,7 +132,7 @@
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-400 col-span-2 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
                         <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Lojas com Dias Faltantes</p>
-                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">*Dia atual ignorado</span>
+                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Baseado no intervalo selecionado</span>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
                         <p class="text-center italic text-slate-400 mt-4">Processando...</p>
@@ -282,6 +295,8 @@
         function toggleGlobal(state) { document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = state); }
         function applyFilters() {
             const selected = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
+            // ATENÇÃO: Aqui não filtramos rawData por data, pois precisamos do rawData completo para calcular as datas faltantes corretas
+            // O filtro de data será aplicado na hora de processar.
             runAudit(rawData.filter(r => selected.includes(r['Buyer'])), selected);
         }
 
@@ -315,10 +330,23 @@
             let trendData = {}, storeTotalWaste = {}, productTotalWaste = {};
             let errorRows = [], allValidDates = [];
 
+            // FILTER BY DATE RANGE IF SELECTED
+            const startInput = document.getElementById('filter-start-date').value;
+            const endInput = document.getElementById('filter-end-date').value;
+            const startDate = startInput ? new Date(startInput) : null;
+            const endDate = endInput ? new Date(endInput) : null;
+
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
-                if (date) allValidDates.push(date);
+                
+                // DATA FILTERING
+                if (date) {
+                    if (startDate && date < startDate) return;
+                    if (endDate && date > endDate) return;
+                    allValidDates.push(date);
+                }
+
                 let val = typeof row['Value'] === 'string' ? parseFloat(row['Value'].replace(/[€\s]/g,'').replace(',','.')) : Number(row['Value'])||0;
                 storeTotalWaste[buyer] = (storeTotalWaste[buyer] || 0) + val;
                 globalTotalVal += val;
@@ -354,7 +382,7 @@
                 const validTypes = ["purchase", "sub-recipe", "inventory item", "preparation"];
                 if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 
-                // REGRA PREPARATION
+                // REGRA PREPARATION V24
                 if (type.toLowerCase() === "preparation" && desc.toLowerCase() !== "end of day") {
                     errs.push("PREPARATION deve ser 'End of Day'");
                 }
@@ -364,12 +392,10 @@
                     if (type.toLowerCase() !== "sub-recipe" && type.toLowerCase() !== "preparation") {
                         errs.push("RFU deve ser Sub-recipe ou Preparation");
                     } else if (type.toLowerCase() === "sub-recipe") {
-                        // Se for Sub-recipe, aplica a regra de description
                         if (desc.toLowerCase() !== "end of day" && !desc.toLowerCase().includes("expired") && !desc.toLowerCase().includes("spoiled")) {
                             errs.push("RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'");
                         }
                     }
-                    // Se for Preparation, a regra de "Preparation" acima já valida o End of Day
                 }
 
                 if(errs.length > 0) {
@@ -396,12 +422,23 @@
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
-            if (allValidDates.length > 0) {
-                allValidDates.sort((a,b) => a-b);
-                globalMinDate = allValidDates[0]; globalMaxDate = allValidDates[allValidDates.length-1];
-                document.getElementById('period-start').innerText = globalMinDate.toLocaleDateString('pt-PT');
-                document.getElementById('period-end').innerText = globalMaxDate.toLocaleDateString('pt-PT');
-                checkMissingDates(allValidDates, activeStores);
+            // Date Handling for Missing Dates
+            let minDate, maxDate;
+            if (startDate) {
+                minDate = startDate;
+                maxDate = endDate ? endDate : (allValidDates.length > 0 ? allValidDates.sort((a,b)=>a-b)[allValidDates.length-1] : startDate);
+            } else {
+                if (allValidDates.length > 0) {
+                    allValidDates.sort((a,b) => a-b);
+                    minDate = allValidDates[0];
+                    maxDate = allValidDates[allValidDates.length-1];
+                }
+            }
+
+            if (minDate && maxDate) {
+                document.getElementById('period-start').innerText = minDate.toLocaleDateString('pt-PT');
+                document.getElementById('period-end').innerText = maxDate.toLocaleDateString('pt-PT');
+                checkMissingDates(minDate, maxDate, activeStores);
             } else {
                 document.getElementById('period-start').innerText = "--"; document.getElementById('period-end').innerText = "--";
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
@@ -410,19 +447,21 @@
             renderEvolutionChart(currentEvolutionMode);
         }
 
-        function checkMissingDates(sortedAllDates, activeStores) {
-            const min = sortedAllDates[0], max = sortedAllDates[sortedAllDates.length-1], todayISO = new Date().toISOString().split('T')[0];
+        function checkMissingDates(min, max, activeStores) {
             const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
+            
+            // Check against full raw data to find presence
             rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
                 const d = parseDate(r['Date']); if(d && r['Buyer']) storePresentDays[r['Buyer']].add(d.toISOString().split('T')[0]);
             });
+            
             const log = document.getElementById('missing-dates-log'); log.innerHTML = ''; let hasMissing = false;
             activeStores.forEach(store => {
                 let missing = [];
                 for(let d = new Date(min); d <= max; d.setDate(d.getDate()+1)) {
                     const iso = d.toISOString().split('T')[0];
-                    if (iso !== todayISO && !storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
+                    if(!storePresentDays[store].has(iso)) missing.push(d.toLocaleDateString('pt-PT').slice(0,5));
                 }
                 if(missing.length > 0) {
                     hasMissing = true;
@@ -494,7 +533,6 @@
             storeChartInstance = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openStoreModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- GENERIC MODAL LOGIC ---
         function openGenericModal(title, subtitle, items) {
             currentModalContext = { title, subtitle, items };
             document.getElementById('modal-title').innerText = title;
@@ -676,14 +714,7 @@ function showDaily(prodName){
 function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); }
 initMainChart();
 <\/script></body></html>`;
-            const blob = new Blob([htmlContent], { type: "text/html" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Relatorio_Grupo_${new Date().toISOString().slice(0,10)}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            const blob = new Blob([htmlContent], { type: "text/html" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Relatorio_Grupo_${new Date().toISOString().slice(0,10)}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
         document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
