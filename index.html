@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V29 (Correção Gráficos)</title>
+    <title>Dashboard Desperdícios - V30 (Clean & Preciso)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -60,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 29: Correção de Gráficos Diários.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 30: Layout Limpo e Preciso.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -69,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-chart-line text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-file-upload text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .xls, .csv)</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -90,7 +90,7 @@
                             <input type="date" id="filter-end-date" onchange="applyFilters()" class="border border-slate-300 rounded px-2 py-1 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
                         <div class="flex items-end">
-                            <span class="text-xs text-slate-400 italic mb-1.5">* Vazio = Automático</span>
+                            <span class="text-xs text-slate-400 italic mb-1.5">* Opcional (Filtra todo o dashboard)</span>
                         </div>
                     </div>
 
@@ -120,7 +120,7 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500 flex justify-between items-center">
                     <div>
                         <p class="text-xs text-red-400 uppercase font-bold">Lançamentos Errados</p>
@@ -130,22 +130,11 @@
                     <i class="fas fa-times-circle text-red-100 text-3xl"></i>
                 </div>
                 
-                <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-yellow-400 flex flex-col justify-center">
-                    <div class="flex justify-between items-center mb-1">
-                        <p class="text-xs text-yellow-600 uppercase font-bold">Lojas com Lançamento Zero</p>
-                        <i class="fas fa-search-dollar text-yellow-200 text-2xl"></i>
-                    </div>
-                    <div class="bg-yellow-50 rounded text-[10px] text-yellow-900 overflow-y-auto h-16 custom-scroll p-2 border border-yellow-100" id="zero-value-log">
-                        <p class="text-center italic text-slate-400">Nenhuma.</p>
-                    </div>
-                </div>
-
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
                         <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Dias Faltantes</p>
-                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Intervalo Selecionado</span>
                     </div>
-                    <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-16 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
+                    <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-20 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
                         <p class="text-center italic text-slate-400 mt-4">Processando...</p>
                     </div>
                 </div>
@@ -309,12 +298,11 @@
             runAudit(rawData.filter(r => selected.includes(r['Buyer'])), selected);
         }
 
-        // --- DATA PARSING SEGURO (LOCAL TIME) ---
         function parseDate(val) {
             if (val instanceof Date) return val;
             if (typeof val === 'string' && val.split(/[\/\-]/).length === 3) {
                 const p = val.trim().split(/[\/\-]/);
-                return new Date(p[2], p[1]-1, p[0]); // Gera data local (00:00)
+                return new Date(p[2], p[1]-1, p[0]);
             }
             return null;
         }
@@ -400,10 +388,12 @@
                 const validTypes = ["purchase", "sub-recipe", "inventory item", "preparation"];
                 if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 
+                // REGRA PREPARATION V24
                 if (type.toLowerCase() === "preparation" && desc.toLowerCase() !== "end of day") {
                     errs.push("PREPARATION deve ser 'End of Day'");
                 }
 
+                // CORREÇÃO RFU V25
                 if(name.toUpperCase().includes("RFU")) {
                     if (type.toLowerCase() !== "sub-recipe" && type.toLowerCase() !== "preparation") {
                         errs.push("RFU deve ser Sub-recipe ou Preparation");
@@ -460,25 +450,18 @@
             }
             updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
             renderEvolutionChart(currentEvolutionMode);
-            checkZeroValueStores(storeTotalWaste, activeStores);
         }
 
-        function checkZeroValueStores(storeTotalWaste, activeStores) {
-            const zeroLog = document.getElementById('zero-value-log'); zeroLog.innerHTML = ''; let hasZero = false;
-            activeStores.forEach(store => {
-                if (storeTotalWaste[store] !== undefined && storeTotalWaste[store] === 0) {
-                    hasZero = true; zeroLog.innerHTML += `<div class="mb-1 border-b border-yellow-200 pb-1 last:border-0 text-xs text-yellow-800"><strong>${store}</strong>: Lançou € 0,00</div>`;
-                }
-            });
-            if (!hasZero) zeroLog.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Tudo OK</div>';
-        }
-
+        // --- CHECK DIAS FALTANTES (CLEAN) ---
         function checkMissingDates(min, max, activeStores) {
             const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
+            
+            // Check against full raw data to find presence
             rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
                 const d = parseDate(r['Date']); if(d && r['Buyer']) storePresentDays[r['Buyer']].add(getLocalISO(d));
             });
+            
             const log = document.getElementById('missing-dates-log'); log.innerHTML = ''; let hasMissing = false;
             activeStores.forEach(store => {
                 let missing = [];
@@ -504,26 +487,40 @@
         function renderEvolutionChart(mode) {
             if(evolutionChartInstance) evolutionChartInstance.destroy();
             let labels = [], values = [], rawKeys = [];
+
             if (mode === 'daily') {
                 rawKeys = Object.keys(evolutionDataStore.daily).sort();
                 labels = rawKeys.map(k => k.split('-').reverse().slice(0,2).join('/'));
                 values = rawKeys.map(k => evolutionDataStore.daily[k]);
             } else if (mode === 'weekly') {
                 const sortedEntries = Object.entries(evolutionDataStore.weekly).sort((a,b) => a[1].sort - b[1].sort);
-                labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val);
+                labels = sortedEntries.map(e => e[0]);
+                rawKeys = labels;
+                values = sortedEntries.map(e => e[1].val);
             } else if (mode === 'monthly') {
                 const sortedEntries = Object.entries(evolutionDataStore.monthly).sort((a,b) => a[1].sort - b[1].sort);
-                labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val);
+                labels = sortedEntries.map(e => e[0]);
+                rawKeys = labels;
+                values = sortedEntries.map(e => e[1].val);
             }
+
             const ind = document.getElementById('evolution-trend-indicator');
             if (values.length >= 2) {
                 const last = values[values.length-1], prev = values[values.length-2], diff = last - prev;
                 ind.innerHTML = `<span class="${diff>0?'text-red-500':'text-green-500'}">${diff>0?'⬆️':'⬇️'} (€ ${Math.abs(diff).toFixed(0)})</span>`;
             } else ind.innerHTML = "";
+
             const ctx = document.getElementById('evolutionChart');
             evolutionChartInstance = new Chart(ctx, {
-                type: 'bar', data: { labels, datasets: [{ label: 'Gasto (€)', data: values, backgroundColor: '#6366f1', borderRadius: 4 }] },
-                options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, scales: { y: { beginAtZero: true }, x: { grid: { display: false } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openPeriodModal(rawKeys[activeElements[0].index], mode); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' }
+                type: 'bar',
+                data: { labels, datasets: [{ label: 'Gasto (€)', data: values, backgroundColor: '#6366f1', borderRadius: 4 }] },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => `€ ${c.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } },
+                    scales: { y: { beginAtZero: true }, x: { grid: { display: false } } },
+                    onClick: (evt, activeElements) => { if (activeElements.length > 0) openPeriodModal(rawKeys[activeElements[0].index], mode); },
+                    onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
+                }
             });
         }
 
@@ -601,11 +598,13 @@
             productItems.forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
 
             const labels = [], dataValues = [];
-            let chartStart = globalMinDate, chartEnd = globalMaxDate;
+            
+            // Logica para preencher datas do gráfico drill-down
+            // Se tiver filtro de data, usa ele. Se não, usa global.
             const startInput = document.getElementById('filter-start-date').value;
             const endInput = document.getElementById('filter-end-date').value;
-            if(startInput) chartStart = new Date(startInput);
-            if(endInput) chartEnd = new Date(endInput);
+            let chartStart = startInput ? new Date(startInput) : globalMinDate;
+            let chartEnd = endInput ? new Date(endInput) : globalMaxDate;
 
             if (chartStart && chartEnd) {
                 for (let d = new Date(chartStart); d <= chartEnd; d.setDate(d.getDate() + 1)) {
@@ -635,8 +634,11 @@
             const title = currentModalContext.title;
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
-            const minD = globalMinDate ? getLocalISO(globalMinDate) : null;
-            const maxD = globalMaxDate ? getLocalISO(globalMaxDate) : null;
+            // Datas para o grafico do report offline
+            const startInput = document.getElementById('filter-start-date').value;
+            const endInput = document.getElementById('filter-end-date').value;
+            const minD = startInput ? startInput : (globalMinDate ? getLocalISO(globalMinDate) : null);
+            const maxD = endInput ? endInput : (globalMaxDate ? getLocalISO(globalMaxDate) : null);
 
             const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório - ${title}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script></head><body class="p-6 text-slate-800"><div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">${title}</h1><p class="text-slate-300 text-sm">Relatório (${pStart} - ${pEnd})</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded">Imprimir</button></div><div class="p-6"><button id="btn-back" onclick="renderView()" class="hidden mb-4 bg-gray-200 px-3 py-1 rounded">Voltar</button><div class="h-[500px]"><canvas id="mainChart"></canvas></div></div></div><script>const rawData=${JSON.stringify(items)}, minD="${minD}", maxD="${maxD}"; let chart=null; function renderView(){ document.getElementById('btn-back').classList.add('hidden'); const agg={}; rawData.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted=Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const cols=sorted.map((_,i)=>i<sorted.length/3?'#ef4444':(i<sorted.length*2/3?'#eab308':'#22c55e')); if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:sorted.map(x=>x.name),datasets:[{label:'€',data:sorted.map(x=>x.val),backgroundColor:cols}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el.length)renderDaily(sorted[el[0].index].name)}}}); } function renderDaily(name){ document.getElementById('btn-back').classList.remove('hidden'); const dMap={}; rawData.filter(i=>i.name===name).forEach(i=>{if(i.dateStr)dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=[],dat=[]; if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}} if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:lbl,datasets:[{label:'€',data:dat,backgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false}}); } renderView();<\/script></body></html>`;
             const blob = new Blob([htmlContent], { type: "text/html" });
@@ -659,11 +661,58 @@
 
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
-            const minD = globalMinDate ? getLocalISO(globalMinDate) : null;
-            const maxD = globalMaxDate ? getLocalISO(globalMaxDate) : null;
+            const startInput = document.getElementById('filter-start-date').value;
+            const endInput = document.getElementById('filter-end-date').value;
+            const minD = startInput ? startInput : (globalMinDate ? getLocalISO(globalMinDate) : null);
+            const maxD = endInput ? endInput : (globalMaxDate ? getLocalISO(globalMaxDate) : null);
             const reportTitle = "Relatório Consolidado de Desperdício";
 
-            const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${reportTitle}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script><style>body{font-family:'Segoe UI',sans-serif;background-color:#f8fafc}.custom-scroll::-webkit-scrollbar{width:6px}.custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}.modal{transition:opacity 0.25s ease}body.modal-active{overflow-x:hidden;overflow-y:hidden!important}</style></head><body class="p-6 text-slate-800"><div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50"><div class="absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div><div class="bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"><div class="py-4 px-6 bg-slate-50 border-b flex justify-between items-center"><div class="flex items-center gap-4"><button id="btn-back-level" onclick="openStoreModal(currentStoreName)" class="hidden bg-white border px-3 py-1 rounded text-sm">&larr; Voltar</button><div><p class="text-xl font-bold" id="modal-title">Loja</p></div></div><div class="cursor-pointer bg-slate-200 w-8 h-8 flex items-center justify-center rounded-full" onclick="closeModal()">X</div></div><div class="p-6 flex-1 overflow-y-auto"><div class="relative h-[500px] w-full"><canvas id="modalChart"></canvas></div></div></div></div><div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between items-center"><div><h1 class="text-2xl font-bold">${reportTitle}</h1><p class="text-slate-300 text-sm">Período: ${pStart} até ${pEnd}</p></div><button onclick="window.print()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm">Imprimir</button></div><div class="p-6"><h2 class="text-lg font-bold text-slate-700 mb-4">Ranking de Desperdício Total (€) por Loja</h2><p class="text-sm text-slate-500 mb-4">Clique nas barras para ver detalhes.</p><div class="relative h-[600px] w-full"><canvas id="mainChart"></canvas></div></div></div><script>const groupData=${JSON.stringify(groupItems)}, minD="${minD}", maxD="${maxD}"; let mainChart=null, modalChart=null, currentStoreName=null; function initMainChart(){ const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); }); const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]); const ctx = document.getElementById('mainChart').getContext('2d'); mainChart = new Chart(ctx, { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: '#4f46e5', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: {x:{grid:{display:false}}}, onClick: (e,el)=>{if(el.length) openStoreModal(sortedStores[el[0].index][0]);}, onHover:(e,el)=>e.native.target.style.cursor=el[0]?'pointer':'default' } }); } function openStoreModal(storeName){ currentStoreName = storeName; document.getElementById('modal-title').innerText = storeName; document.getElementById('btn-back-level').classList.add('hidden'); document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); const items = groupData[storeName] || []; const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const total = sorted.length; const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e')); if(modalChart) modalChart.destroy(); const ctx = document.getElementById('modalChart').getContext('2d'); modalChart = new Chart(ctx, { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } }); } function showDaily(prodName){ document.getElementById('modal-title').innerText = prodName + " (" + currentStoreName + ")"; document.getElementById('btn-back-level').classList.remove('hidden'); const items = groupData[currentStoreName].filter(i=>i.name===prodName); const dMap={}; items.forEach(i=>{if(i.dateStr) dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=[], dat=[]; if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}} if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart'), { type: 'bar', data: { labels: lbl, datasets: [{ label: '€', data: dat, backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } }); } function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); } initMainChart(); <\/script></body></html>`;
+            const htmlContent = `
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${reportTitle}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script><style>body{font-family:'Segoe UI',sans-serif;background-color:#f8fafc}.custom-scroll::-webkit-scrollbar{width:6px}.custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}.modal{transition:opacity 0.25s ease}body.modal-active{overflow-x:hidden;overflow-y:hidden!important}</style></head><body class="p-6 text-slate-800">
+<div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50"><div class="absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div><div class="bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"><div class="py-4 px-6 bg-slate-50 border-b flex justify-between items-center"><div class="flex items-center gap-4"><button id="btn-back-level" onclick="openStoreModal(currentStoreName)" class="hidden bg-white border px-3 py-1 rounded text-sm">&larr; Voltar</button><div><p class="text-xl font-bold" id="modal-title">Loja</p></div></div><div class="cursor-pointer bg-slate-200 w-8 h-8 flex items-center justify-center rounded-full" onclick="closeModal()">X</div></div><div class="p-6 flex-1 overflow-y-auto"><div class="relative h-[500px] w-full"><canvas id="modalChart"></canvas></div></div></div></div>
+<div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+<div class="bg-slate-800 text-white p-6 flex justify-between items-center"><div><h1 class="text-2xl font-bold">${reportTitle}</h1><p class="text-slate-300 text-sm">Período: ${pStart} até ${pEnd}</p></div><button onclick="window.print()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm">Imprimir</button></div>
+<div class="p-6"><h2 class="text-lg font-bold text-slate-700 mb-4">Ranking de Desperdício Total (€) por Loja</h2><p class="text-sm text-slate-500 mb-4">Clique nas barras para ver detalhes.</p><div class="relative h-[600px] w-full"><canvas id="mainChart"></canvas></div></div></div>
+<script>
+const groupData=${JSON.stringify(groupItems)}, minD="${minD}", maxD="${maxD}"; let mainChart=null, modalChart=null, currentStoreName=null;
+function initMainChart(){
+    const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); });
+    const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]);
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    mainChart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: '#4f46e5', borderRadius: 4 }] },
+        options: { responsive: true, maintainAspectRatio: false, scales: {x:{grid:{display:false}}}, onClick: (e,el)=>{if(el.length) openStoreModal(sortedStores[el[0].index][0]);}, onHover:(e,el)=>e.native.target.style.cursor=el[0]?'pointer':'default' }
+    });
+}
+function openStoreModal(storeName){
+    currentStoreName = storeName;
+    document.getElementById('modal-title').innerText = storeName;
+    document.getElementById('btn-back-level').classList.add('hidden');
+    document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none');
+    document.body.classList.add('modal-active');
+    const items = groupData[storeName] || [];
+    const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val);
+    const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val);
+    const total = sorted.length;
+    const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e'));
+    if(modalChart) modalChart.destroy();
+    const ctx = document.getElementById('modalChart').getContext('2d');
+    modalChart = new Chart(ctx, { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } });
+}
+function showDaily(prodName){
+    document.getElementById('modal-title').innerText = prodName + " (" + currentStoreName + ")";
+    document.getElementById('btn-back-level').classList.remove('hidden');
+    const items = groupData[currentStoreName].filter(i=>i.name===prodName);
+    const dMap={}; items.forEach(i=>{if(i.dateStr) dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val});
+    const lbl=[], dat=[];
+    if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}}
+    if(modalChart) modalChart.destroy();
+    modalChart = new Chart(document.getElementById('modalChart'), { type: 'bar', data: { labels: lbl, datasets: [{ label: '€', data: dat, backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } });
+}
+function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); }
+initMainChart();
+<\/script></body></html>`;
             const blob = new Blob([htmlContent], { type: "text/html" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Relatorio_Grupo_${new Date().toISOString().slice(0,10)}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
         }
 
