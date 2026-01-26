@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V30 (Clean & Preciso)</title>
+    <title>Dashboard Desperdícios - V31 (Correção de Texto/Espaços)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -60,7 +60,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 30: Layout Limpo e Preciso.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 31: Normalização de Dados (Correção de Espaços).</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -69,7 +69,7 @@
 
         <div id="upload-section" class="bg-white p-6 rounded-xl shadow-sm mb-6 transition-all duration-300">
             <div id="drop-zone" class="drag-area rounded-xl p-8 text-center cursor-pointer flex flex-col items-center justify-center h-32 hover:bg-slate-50">
-                <i class="fas fa-file-upload text-4xl text-blue-500 mb-3"></i>
+                <i class="fas fa-magic text-4xl text-blue-500 mb-3"></i>
                 <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
                 <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .xls, .csv)</p>
                 <input type="file" id="file-input" class="hidden" accept=".xlsx, .xls, .csv" />
@@ -90,7 +90,7 @@
                             <input type="date" id="filter-end-date" onchange="applyFilters()" class="border border-slate-300 rounded px-2 py-1 text-sm text-slate-700 focus:ring-2 focus:ring-blue-500 outline-none">
                         </div>
                         <div class="flex items-end">
-                            <span class="text-xs text-slate-400 italic mb-1.5">* Opcional (Filtra todo o dashboard)</span>
+                            <span class="text-xs text-slate-400 italic mb-1.5">* Opcional</span>
                         </div>
                     </div>
 
@@ -129,10 +129,10 @@
                     </div>
                     <i class="fas fa-times-circle text-red-100 text-3xl"></i>
                 </div>
-                
                 <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex flex-col">
                     <div class="flex justify-between items-center mb-2">
                         <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Dias Faltantes</p>
+                        <span class="text-[10px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded">Intervalo Selecionado</span>
                     </div>
                     <div class="bg-amber-50 rounded text-[11px] text-amber-900 overflow-y-auto h-20 custom-scroll p-2 border border-amber-100" id="missing-dates-log">
                         <p class="text-center italic text-slate-400 mt-4">Processando...</p>
@@ -245,6 +245,21 @@
                     const data = new Uint8Array(e.target.result);
                     const workbook = XLSX.read(data, { type: 'array' });
                     rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "", cellDates: true, raw: false });
+                    
+                    // --- NORMALIZAÇÃO DE DADOS (NOVO V31) ---
+                    // Remove espaços extras de todas as colunas de texto para evitar erros de comparação
+                    rawData = rawData.map(row => {
+                        const newRow = {};
+                        for (let key in row) {
+                            let val = row[key];
+                            if (typeof val === 'string') {
+                                val = val.trim();
+                            }
+                            newRow[key.trim()] = val;
+                        }
+                        return newRow;
+                    });
+                    
                     if (!rawData.length) throw new Error("Vazia");
                     initializeDashboard();
                 } catch (err) { alert("Erro: " + err.message); }
@@ -388,12 +403,10 @@
                 const validTypes = ["purchase", "sub-recipe", "inventory item", "preparation"];
                 if(!validTypes.includes(type.toLowerCase())) errs.push(type.toLowerCase()==="menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${type})`);
                 
-                // REGRA PREPARATION V24
                 if (type.toLowerCase() === "preparation" && desc.toLowerCase() !== "end of day") {
                     errs.push("PREPARATION deve ser 'End of Day'");
                 }
 
-                // CORREÇÃO RFU V25
                 if(name.toUpperCase().includes("RFU")) {
                     if (type.toLowerCase() !== "sub-recipe" && type.toLowerCase() !== "preparation") {
                         errs.push("RFU deve ser Sub-recipe ou Preparation");
@@ -452,14 +465,18 @@
             renderEvolutionChart(currentEvolutionMode);
         }
 
-        // --- CHECK DIAS FALTANTES (CLEAN) ---
+        // --- CHECK DIAS FALTANTES (CLEAN & ROBUST) ---
         function checkMissingDates(min, max, activeStores) {
-            const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
+            const storePresentDays = {}; 
+            activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             
-            // Check against full raw data to find presence
+            // Check against full raw data (already normalized in handleFile)
             rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
-                const d = parseDate(r['Date']); if(d && r['Buyer']) storePresentDays[r['Buyer']].add(getLocalISO(d));
+                const d = parseDate(r['Date']); 
+                if(d && r['Buyer']) {
+                    storePresentDays[r['Buyer']].add(getLocalISO(d));
+                }
             });
             
             const log = document.getElementById('missing-dates-log'); log.innerHTML = ''; let hasMissing = false;
@@ -634,7 +651,6 @@
             const title = currentModalContext.title;
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
-            // Datas para o grafico do report offline
             const startInput = document.getElementById('filter-start-date').value;
             const endInput = document.getElementById('filter-end-date').value;
             const minD = startInput ? startInput : (globalMinDate ? getLocalISO(globalMinDate) : null);
