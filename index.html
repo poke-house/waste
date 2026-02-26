@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - V32 (Metas, Anomalias e Toasts)</title>
+    <title>Dashboard Desperdícios - V33 (Regras Arroz)</title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -62,7 +62,7 @@
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
             <div>
                 <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
-                <p class="text-slate-500 text-sm mt-1">Versão 32: Metas, Detecção de Anomalias e Toasts.</p>
+                <p class="text-slate-500 text-sm mt-1">Versão 33: Adicionadas Regras Específicas para Arroz.</p>
             </div>
             <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                 <i class="fas fa-sync-alt mr-2"></i> Nova Análise
@@ -224,7 +224,7 @@
     </div>
 
     <script>
-        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO (SEPARADO E ESCALÁVEL) ---
+        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO ---
         const validationRules = [
             {
                 id: "CPK_IN_NAME",
@@ -244,18 +244,49 @@
             {
                 id: "RFU_RULES",
                 check: (item) => {
-                    if (!item.name.toUpperCase().includes("RFU")) return false; // Ignora se não tiver RFU
+                    if (!item.name.toUpperCase().includes("RFU")) return false;
                     const t = item.type.toLowerCase();
                     const d = item.desc.toLowerCase();
-                    if (t !== "sub-recipe" && t !== "preparation") return true; // Falha na regra
+                    if (t !== "sub-recipe" && t !== "preparation") return true; 
                     if (t === "sub-recipe") {
-                        if (d !== "end of day" && !d.includes("expired") && !d.includes("spoiled")) return true; // Falha
+                        if (d !== "end of day" && !d.includes("expired") && !d.includes("spoiled")) return true; 
                     }
-                    return false; // Tudo OK
+                    return false; 
                 },
                 message: (item) => {
                     if (!["sub-recipe", "preparation"].includes(item.type.toLowerCase())) return "RFU deve ser Sub-recipe ou Preparation";
                     return "RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'";
+                }
+            },
+            // --- NOVA REGRA DO ARROZ (V33) ---
+            {
+                id: "RICE_RULES",
+                check: (item) => {
+                    const name = item.name.toUpperCase();
+                    const isRice = ["ARROZ BASMATI", "ARROZ INTEGRAL", "ARROZ NEGRO", "ARROZ SUSHI"].some(r => name.includes(r));
+                    if (!isRice) return false; // Se não for um dos arrozes, pula a regra
+
+                    const t = item.type.toLowerCase();
+                    const d = item.desc.toLowerCase();
+                    const hasRFU = name.includes("RFU");
+
+                    if (hasRFU) {
+                        // Se tem RFU: tem que ser Sub-Recipe e End Of Day
+                        if (t !== "sub-recipe" || d !== "end of day") return true; // Gera erro
+                    } else {
+                        // Se NÃO tem RFU: tem que ser Inventory item (ou Purchase) e Expired/Spoiled/Dropped/Broken
+                        if (t !== "inventory item" && t !== "purchase") return true; // Gera erro
+                        if (!d.includes("expired") && !d.includes("spoiled") && !d.includes("dropped") && !d.includes("broken")) return true; // Gera erro
+                    }
+                    return false; // Tudo OK
+                },
+                message: (item) => {
+                    const hasRFU = item.name.toUpperCase().includes("RFU");
+                    if (hasRFU) {
+                        return "Arroz com RFU deve ser tipo 'Sub-recipe' e descrição 'End of day'";
+                    } else {
+                        return "Arroz sem RFU deve ser tipo 'Inventory item' com descrição de perda (Expired, Spoiled, Dropped, Broken)";
+                    }
                 }
             }
         ];
@@ -270,17 +301,15 @@
         const amHexColors = { "Sulamita": "#7c3aed", "Marcelo": "#2563eb", "Monique": "#db2777", "José": "#ea580c", "Outros": "#64748b" };
         const amTailwindColors = { "Sulamita": "border-violet-500 text-violet-700 bg-violet-50", "Marcelo": "border-blue-500 text-blue-700 bg-blue-50", "Monique": "border-pink-500 text-pink-700 bg-pink-50", "José": "border-orange-500 text-orange-700 bg-orange-50", "Outros": "border-slate-400 text-slate-600 bg-slate-100" };
 
-        // METAS DIÁRIAS POR LOJA (Em Euros)
         const storeTargets = {
             "PT006 - Miraflores": 15,
             "PT008 - Infante Santo": 12,
             "PT010 - Amoreiras": 20,
             "PT018 - Almada": 25,
             "PT012 - Alfragide": 18,
-            "DEFAULT": 15 // Meta padrão caso a loja não esteja listada
+            "DEFAULT": 15
         };
 
-        // GLOBAIS
         let rawData = [], uniqueStores = [], processedErrors = [], storeToAMMap = {}, storeDetailsMap = {};
         let globalMinDate = null, globalMaxDate = null;
         let productChartInstance = null, evolutionChartInstance = null, storeChartInstance = null, modalChartInstance = null, trendChartInstance = null;
@@ -294,19 +323,11 @@
             const toast = document.createElement('div');
             const bg = type === 'error' ? 'bg-red-500' : 'bg-green-500';
             const icon = type === 'error' ? 'fa-exclamation-triangle' : 'fa-check-circle';
-            
             toast.className = `${bg} px-4 py-3 rounded shadow-lg text-white text-sm font-bold flex items-center transition-all duration-500 transform translate-x-full opacity-0`;
             toast.innerHTML = `<i class="fas ${icon} mr-2"></i> ${message}`;
             container.appendChild(toast);
-            
-            // Animate in
             setTimeout(() => { toast.classList.remove('translate-x-full', 'opacity-0'); }, 10);
-            
-            // Animate out
-            setTimeout(() => {
-                toast.classList.add('translate-x-full', 'opacity-0');
-                setTimeout(() => toast.remove(), 500);
-            }, 4000);
+            setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 500); }, 4000);
         }
 
         // --- UPLOAD E INICIALIZAÇÃO ---
@@ -326,19 +347,16 @@
                     const workbook = XLSX.read(data, { type: 'array' });
                     rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "", cellDates: true, raw: false });
                     
-                    // Limpeza de espaços (Trim)
                     rawData = rawData.map(row => {
                         const newRow = {};
-                        for (let key in row) {
-                            newRow[key.trim()] = typeof row[key] === 'string' ? row[key].trim() : row[key];
-                        }
+                        for (let key in row) { newRow[key.trim()] = typeof row[key] === 'string' ? row[key].trim() : row[key]; }
                         return newRow;
                     });
                     
                     if (!rawData.length) throw new Error("A planilha está vazia.");
                     
                     initializeDashboard();
-                    showToast("Arquivo carregado e processado com sucesso!", "success");
+                    showToast("Arquivo carregado com sucesso!", "success");
                 } catch (err) { 
                     showToast("Erro ao processar: " + err.message, "error");
                 } finally { 
@@ -420,63 +438,37 @@
             };
         }
 
-        // --- ALGORITMO DE ANOMALIAS (Z-SCORE) ---
         function calculateAnomalies(itemsList) {
             const grouped = {};
-            itemsList.forEach(i => {
-                if(!grouped[i.name]) grouped[i.name] = [];
-                grouped[i.name].push(i);
-            });
-
+            itemsList.forEach(i => { if(!grouped[i.name]) grouped[i.name] = []; grouped[i.name].push(i); });
             const anomalies = [];
             for (let name in grouped) {
                 const group = grouped[name];
-                if (group.length < 5) continue; // Precisa de base histórica mínima
-                
+                if (group.length < 5) continue; 
                 const values = group.map(g => g.val);
                 const mean = values.reduce((a,b)=>a+b, 0) / values.length;
                 const variance = values.reduce((a,b)=>a + Math.pow(b-mean, 2), 0) / values.length;
                 const stdDev = Math.sqrt(variance);
-
                 group.forEach(item => {
-                    // Pico 2x desvios padrão acima da média E valor maior que 10 euros
-                    if (item.val > (mean + (2 * stdDev)) && item.val > 10) {
-                        anomalies.push({ ...item, mean: mean });
-                    }
+                    if (item.val > (mean + (2 * stdDev)) && item.val > 10) anomalies.push({ ...item, mean: mean });
                 });
             }
             return anomalies.sort((a,b) => b.val - a.val);
         }
 
         function renderAnomalies(anomalies) {
-            const log = document.getElementById('anomalies-log');
-            log.innerHTML = '';
-            if (anomalies.length === 0) {
-                log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhuma anomalia detectada.</p>';
-                return;
-            }
-            // Mostra top 10 anomalias
+            const log = document.getElementById('anomalies-log'); log.innerHTML = '';
+            if (anomalies.length === 0) { log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhuma anomalia.</p>'; return; }
             anomalies.slice(0, 10).forEach(anom => {
-                log.innerHTML += `
-                    <div class="mb-2 border-b border-purple-200 pb-1 last:border-0">
-                        <div class="flex justify-between items-center">
-                            <strong class="text-purple-800 text-xs truncate max-w-[60%]">${anom.name}</strong>
-                            <span class="text-xs font-bold text-red-600">€ ${anom.val.toFixed(2)}</span>
-                        </div>
-                        <div class="text-[10px] text-purple-600 flex justify-between mt-0.5">
-                            <span>${anom.buyer.split('-')[1]?.trim() || anom.buyer} (${anom.dateObj.toLocaleDateString('pt-PT').slice(0,5)})</span>
-                            <span>Média ref: € ${anom.mean.toFixed(2)}</span>
-                        </div>
-                    </div>`;
+                log.innerHTML += `<div class="mb-2 border-b border-purple-200 pb-1 last:border-0"><div class="flex justify-between items-center"><strong class="text-purple-800 text-xs truncate max-w-[60%]">${anom.name}</strong><span class="text-xs font-bold text-red-600">€ ${anom.val.toFixed(2)}</span></div><div class="text-[10px] text-purple-600 flex justify-between mt-0.5"><span>${anom.buyer.split('-')[1]?.trim() || anom.buyer} (${anom.dateObj.toLocaleDateString('pt-PT').slice(0,5)})</span><span>Média ref: € ${anom.mean.toFixed(2)}</span></div></div>`;
             });
         }
 
-        // --- LÓGICA DE AUDITORIA E REGRAS ---
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
             processedErrors = []; storeDetailsMap = {};
             evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
-            let allItemsFlat = []; // Para cálculo de anomalias
+            let allItemsFlat = [];
 
             let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
             let trendData = {}, storeTotalWaste = {}, productTotalWaste = {};
@@ -490,7 +482,6 @@
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
-                
                 if (date) {
                     if (startDate && date < startDate) return;
                     if (endDate && date > endDate) return;
@@ -526,12 +517,10 @@
                 storeDetailsMap[buyer].push(itemObj);
                 allItemsFlat.push(itemObj);
 
-                // APLICAÇÃO DAS REGRAS DO DICIONÁRIO
+                // PROCESSAMENTO DE REGRAS
                 let errs = [];
                 validationRules.forEach(rule => {
-                    if (rule.check(itemObj)) {
-                        errs.push(rule.message(itemObj));
-                    }
+                    if (rule.check(itemObj)) errs.push(rule.message(itemObj));
                 });
 
                 if(errs.length > 0) {
@@ -543,7 +532,6 @@
                 }
             });
 
-            // Tabela
             errorRows.sort((a,b) => (a.date && b.date) ? a.date - b.date : 0);
             const frag = document.createDocumentFragment();
             errorRows.forEach(r => {
@@ -580,10 +568,7 @@
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
             
-            // Detecta Anomalias
-            const anomalies = calculateAnomalies(allItemsFlat);
-            renderAnomalies(anomalies);
-
+            renderAnomalies(calculateAnomalies(allItemsFlat));
             updateMainCharts(productTotalWaste, trendData, storeTotalWaste);
             renderEvolutionChart(currentEvolutionMode);
         }
@@ -591,11 +576,9 @@
         function checkMissingDates(min, max, activeStores) {
             const storePresentDays = {}; activeStores.forEach(s => storePresentDays[s] = new Set());
             const checkboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
-            
             rawData.filter(r => checkboxes.includes(r['Buyer'])).forEach(r => {
                 const d = parseDate(r['Date']); if(d && r['Buyer']) storePresentDays[r['Buyer']].add(getLocalISO(d));
             });
-            
             const log = document.getElementById('missing-dates-log'); log.innerHTML = ''; let hasMissing = false;
             activeStores.forEach(store => {
                 let missing = [];
@@ -611,7 +594,6 @@
             if(!hasMissing) log.innerHTML = '<div class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check-circle"></i> Todos os dias lançados!</div>';
         }
 
-        // --- CÁLCULO DE META E EVOLUÇÃO ---
         function switchEvolutionView(mode) {
             currentEvolutionMode = mode;
             document.querySelectorAll('.switch-btn').forEach(btn => btn.classList.remove('active'));
@@ -623,12 +605,9 @@
             if(evolutionChartInstance) evolutionChartInstance.destroy();
             let labels = [], values = [], rawKeys = [], targetValues = [];
             
-            // Calculando a Meta Agregada das Lojas Selecionadas
             const activeStores = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             let dailyTotalTarget = 0;
-            activeStores.forEach(store => {
-                dailyTotalTarget += (storeTargets[store] || storeTargets["DEFAULT"]);
-            });
+            activeStores.forEach(store => { dailyTotalTarget += (storeTargets[store] || storeTargets["DEFAULT"]); });
 
             if (mode === 'daily') {
                 rawKeys = Object.keys(evolutionDataStore.daily).sort();
@@ -686,7 +665,7 @@
             storeChartInstance = new Chart(document.getElementById('storeChart'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Desperdício Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: barColors, borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: { x: { grid: { display: false } } }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: (ctx) => `Total: € ${ctx.raw.toLocaleString('pt-PT', {minimumFractionDigits: 2})}` } } }, onClick: (evt, activeElements) => { if (activeElements.length > 0) openStoreModal(sortedStores[activeElements[0].index][0]); }, onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default' } });
         }
 
-        // --- MODAL ---
+        // --- MODAIS ---
         function openGenericModal(title, subtitle, items) {
             currentModalContext = { title, subtitle, items };
             document.getElementById('modal-title').innerText = title;
@@ -716,20 +695,14 @@
             });
         }
 
-        function openStoreModal(storeName) {
-            openGenericModal(storeName, "Ranking de Produtos (Semáforo)", storeDetailsMap[storeName] || []);
-        }
-
+        function openStoreModal(storeName) { openGenericModal(storeName, "Ranking de Produtos (Semáforo)", storeDetailsMap[storeName] || []); }
         function openPeriodModal(periodKey, mode) {
             let filteredItems = [];
-            const allStoreKeys = Object.keys(storeDetailsMap);
-            allStoreKeys.forEach(store => {
+            Object.keys(storeDetailsMap).forEach(store => {
                 storeDetailsMap[store].forEach(item => {
-                    let match = false;
-                    if (mode === 'daily') match = (item.dayKey === periodKey);
-                    else if (mode === 'weekly') match = (item.weekLabel === periodKey);
-                    else if (mode === 'monthly') match = (item.monthLabel === periodKey);
-                    if (match) filteredItems.push(item);
+                    if (mode === 'daily' && item.dayKey === periodKey) filteredItems.push(item);
+                    else if (mode === 'weekly' && item.weekLabel === periodKey) filteredItems.push(item);
+                    else if (mode === 'monthly' && item.monthLabel === periodKey) filteredItems.push(item);
                 });
             });
             openGenericModal(periodKey, "Produtos com maior impacto neste período", filteredItems);
@@ -740,9 +713,8 @@
             document.getElementById('modal-subtitle').innerText = "Evolução diária (Contexto Atual)";
             document.getElementById('btn-back-level').classList.remove('hidden');
             
-            const productItems = contextItems.filter(i => i.name === productName);
             const dateValueMap = {};
-            productItems.forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
+            contextItems.filter(i => i.name === productName).forEach(i => { if(i.dateStr) dateValueMap[i.dateStr] = (dateValueMap[i.dateStr] || 0) + i.val; });
 
             const labels = [], dataValues = [];
             const startInput = document.getElementById('filter-start-date').value;
@@ -760,11 +732,7 @@
 
             if(modalChartInstance) modalChartInstance.destroy();
             const ctx = document.getElementById('modalChart').getContext('2d');
-            modalChartInstance = new Chart(ctx, { 
-                type: 'bar', 
-                data: { labels: labels, datasets: [{ label: 'Valor (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }] }, 
-                options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x' } 
-            });
+            modalChartInstance = new Chart(ctx, { type: 'bar', data: { labels: labels, datasets: [{ label: 'Valor (€)', data: dataValues, backgroundColor: '#3b82f6', borderRadius: 2 }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'x' } });
         }
 
         function backToMainLevel() { openGenericModal(currentModalContext.title, currentModalContext.subtitle, currentModalContext.items); }
@@ -775,52 +743,30 @@
             const title = currentModalContext.title;
             const pStart = document.getElementById('period-start').innerText;
             const pEnd = document.getElementById('period-end').innerText;
-            const startInput = document.getElementById('filter-start-date').value;
-            const endInput = document.getElementById('filter-end-date').value;
-            const minD = startInput ? startInput : (globalMinDate ? getLocalISO(globalMinDate) : null);
-            const maxD = endInput ? endInput : (globalMaxDate ? getLocalISO(globalMaxDate) : null);
-
-            const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório - ${title}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script></head><body class="p-6 text-slate-800"><div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">${title}</h1><p class="text-slate-300 text-sm">Relatório (${pStart} - ${pEnd})</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded">Imprimir</button></div><div class="p-6"><button id="btn-back" onclick="renderView()" class="hidden mb-4 bg-gray-200 px-3 py-1 rounded">Voltar</button><div class="h-[500px]"><canvas id="mainChart"></canvas></div></div></div><script>const rawData=${JSON.stringify(items)}, minD="${minD}", maxD="${maxD}"; let chart=null; function renderView(){ document.getElementById('btn-back').classList.add('hidden'); const agg={}; rawData.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted=Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const cols=sorted.map((_,i)=>i<sorted.length/3?'#ef4444':(i<sorted.length*2/3?'#eab308':'#22c55e')); if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:sorted.map(x=>x.name),datasets:[{label:'€',data:sorted.map(x=>x.val),backgroundColor:cols}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el.length)renderDaily(sorted[el[0].index].name)}}}); } function renderDaily(name){ document.getElementById('btn-back').classList.remove('hidden'); const dMap={}; rawData.filter(i=>i.name===name).forEach(i=>{if(i.dateStr)dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=[],dat=[]; if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}} if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:lbl,datasets:[{label:'€',data:dat,backgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false}}); } renderView();<\/script></body></html>`;
+            const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório - ${title}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script></head><body class="p-6 text-slate-800"><div class="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">${title}</h1><p class="text-slate-300 text-sm">Relatório (${pStart} - ${pEnd})</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded">Imprimir</button></div><div class="p-6"><button id="btn-back" onclick="renderView()" class="hidden mb-4 bg-gray-200 px-3 py-1 rounded">Voltar</button><div class="h-[500px]"><canvas id="mainChart"></canvas></div></div></div><script>const rawData=${JSON.stringify(items)}; let chart=null; function renderView(){ document.getElementById('btn-back').classList.add('hidden'); const agg={}; rawData.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted=Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const cols=sorted.map((_,i)=>i<sorted.length/3?'#ef4444':(i<sorted.length*2/3?'#eab308':'#22c55e')); if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:sorted.map(x=>x.name),datasets:[{label:'€',data:sorted.map(x=>x.val),backgroundColor:cols}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,onClick:(e,el)=>{if(el.length)renderDaily(sorted[el[0].index].name)}}}); } function renderDaily(name){ document.getElementById('btn-back').classList.remove('hidden'); const dMap={}; rawData.filter(i=>i.name===name).forEach(i=>{if(i.dateStr)dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=Object.keys(dMap).sort(),dat=lbl.map(l=>dMap[l]); if(chart)chart.destroy(); chart=new Chart(document.getElementById('mainChart'),{type:'bar',data:{labels:lbl,datasets:[{label:'€',data:dat,backgroundColor:'#3b82f6'}]},options:{responsive:true,maintainAspectRatio:false}}); } renderView();<\/script></body></html>`;
             const blob = new Blob([htmlContent], { type: "text/html" });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            a.href = url;
-            a.download = `Relatorio_${title.replace(/[^a-z0-9]/gi, '_')}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            showToast("Relatório baixado com sucesso!");
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Relatorio_${title.replace(/[^a-z0-9]/gi, '_')}.html`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("Relatório baixado com sucesso!");
         }
 
         function downloadGroupReport() {
             const activeCheckboxes = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
-            let groupItems = {};
-            activeCheckboxes.forEach(store => { if (storeDetailsMap[store]) groupItems[store] = storeDetailsMap[store]; });
-
-            if (Object.keys(groupItems).length === 0) { showToast("Nenhuma loja selecionada ou sem dados.", "error"); return; }
-
-            const pStart = document.getElementById('period-start').innerText;
-            const pEnd = document.getElementById('period-end').innerText;
-            const startInput = document.getElementById('filter-start-date').value;
-            const endInput = document.getElementById('filter-end-date').value;
-            const minD = startInput ? startInput : (globalMinDate ? getLocalISO(globalMinDate) : null);
-            const maxD = endInput ? endInput : (globalMaxDate ? getLocalISO(globalMaxDate) : null);
-            const reportTitle = "Relatório Consolidado de Desperdício";
-
-            const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>${reportTitle}</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script><style>body{font-family:'Segoe UI',sans-serif;background-color:#f8fafc}.custom-scroll::-webkit-scrollbar{width:6px}.custom-scroll::-webkit-scrollbar-thumb{background:#cbd5e1;border-radius:3px}.modal{transition:opacity 0.25s ease}body.modal-active{overflow-x:hidden;overflow-y:hidden!important}</style></head><body class="p-6 text-slate-800"><div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50"><div class="absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div><div class="bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"><div class="py-4 px-6 bg-slate-50 border-b flex justify-between items-center"><div class="flex items-center gap-4"><button id="btn-back-level" onclick="openStoreModal(currentStoreName)" class="hidden bg-white border px-3 py-1 rounded text-sm">&larr; Voltar</button><div><p class="text-xl font-bold" id="modal-title">Loja</p></div></div><div class="cursor-pointer bg-slate-200 w-8 h-8 flex items-center justify-center rounded-full" onclick="closeModal()">X</div></div><div class="p-6 flex-1 overflow-y-auto"><div class="relative h-[500px] w-full"><canvas id="modalChart"></canvas></div></div></div></div><div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between items-center"><div><h1 class="text-2xl font-bold">${reportTitle}</h1><p class="text-slate-300 text-sm">Período: ${pStart} até ${pEnd}</p></div><button onclick="window.print()" class="bg-slate-600 hover:bg-slate-500 px-3 py-1 rounded text-sm">Imprimir</button></div><div class="p-6"><h2 class="text-lg font-bold text-slate-700 mb-4">Ranking de Desperdício Total (€) por Loja</h2><p class="text-sm text-slate-500 mb-4">Clique nas barras para ver detalhes.</p><div class="relative h-[600px] w-full"><canvas id="mainChart"></canvas></div></div></div><script>const groupData=${JSON.stringify(groupItems)}, minD="${minD}", maxD="${maxD}"; let mainChart=null, modalChart=null, currentStoreName=null; function initMainChart(){ const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); }); const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]); const ctx = document.getElementById('mainChart').getContext('2d'); mainChart = new Chart(ctx, { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: '#4f46e5', borderRadius: 4 }] }, options: { responsive: true, maintainAspectRatio: false, scales: {x:{grid:{display:false}}}, onClick: (e,el)=>{if(el.length) openStoreModal(sortedStores[el[0].index][0]);}, onHover:(e,el)=>e.native.target.style.cursor=el[0]?'pointer':'default' } }); } function openStoreModal(storeName){ currentStoreName = storeName; document.getElementById('modal-title').innerText = storeName; document.getElementById('btn-back-level').classList.add('hidden'); document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); const items = groupData[storeName] || []; const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const total = sorted.length; const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e')); if(modalChart) modalChart.destroy(); const ctx = document.getElementById('modalChart').getContext('2d'); modalChart = new Chart(ctx, { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } }); } function showDaily(prodName){ document.getElementById('modal-title').innerText = prodName + " (" + currentStoreName + ")"; document.getElementById('btn-back-level').classList.remove('hidden'); const items = groupData[currentStoreName].filter(i=>i.name===prodName); const dMap={}; items.forEach(i=>{if(i.dateStr) dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=[], dat=[]; if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}} if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart'), { type: 'bar', data: { labels: lbl, datasets: [{ label: '€', data: dat, backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } }); } function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); } initMainChart(); <\/script></body></html>`;
-            const blob = new Blob([htmlContent], { type: "text/html" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = `Relatorio_Grupo_${new Date().toISOString().slice(0,10)}.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            showToast("Relatório do grupo baixado com sucesso!");
+            let groupItems = {}; activeCheckboxes.forEach(store => { if (storeDetailsMap[store]) groupItems[store] = storeDetailsMap[store]; });
+            if (Object.keys(groupItems).length === 0) { showToast("Nenhuma loja selecionada.", "error"); return; }
+            const pStart = document.getElementById('period-start').innerText, pEnd = document.getElementById('period-end').innerText;
+            const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Grupo</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script><style>.modal{transition:opacity 0.25s ease}body.modal-active{overflow-x:hidden;overflow-y:hidden!important}</style></head><body class="p-6 text-slate-800"><div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50"><div class="absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div><div class="bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"><div class="py-4 px-6 bg-slate-50 border-b flex justify-between"><button id="btn-back-level" onclick="openStoreModal(currentStoreName)" class="hidden bg-white border px-3 py-1 rounded text-sm">Voltar</button><p class="text-xl font-bold" id="modal-title">Loja</p><div class="cursor-pointer" onclick="closeModal()">X</div></div><div class="p-6 flex-1 overflow-y-auto"><div class="relative h-[500px] w-full"><canvas id="modalChart"></canvas></div></div></div></div><div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">Relatório Consolidado</h1><p class="text-slate-300 text-sm">Período: ${pStart} até ${pEnd}</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded text-sm">Imprimir</button></div><div class="p-6"><div class="relative h-[600px] w-full"><canvas id="mainChart"></canvas></div></div></div><script>const groupData=${JSON.stringify(groupItems)}; let mainChart=null, modalChart=null, currentStoreName=null; function initMainChart(){ const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); }); const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]); mainChart = new Chart(document.getElementById('mainChart').getContext('2d'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: '#4f46e5' }] }, options: { responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) openStoreModal(sortedStores[el[0].index][0]);}, onHover:(e,el)=>e.native.target.style.cursor=el[0]?'pointer':'default' } }); } function openStoreModal(storeName){ currentStoreName = storeName; document.getElementById('modal-title').innerText = storeName; document.getElementById('btn-back-level').classList.add('hidden'); document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); const items = groupData[storeName] || []; const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const total = sorted.length; const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e')); if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart').getContext('2d'), { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } }); } function showDaily(prodName){ document.getElementById('modal-title').innerText = prodName + " (" + currentStoreName + ")"; document.getElementById('btn-back-level').classList.remove('hidden'); const items = groupData[currentStoreName].filter(i=>i.name===prodName); const dMap={}; items.forEach(i=>{if(i.dateStr) dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=Object.keys(dMap).sort(), dat=lbl.map(l=>dMap[l]); if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart'), { type: 'bar', data: { labels: lbl, datasets: [{ label: '€', data: dat, backgroundColor: '#3b82f6' }] }, options: { responsive: true, maintainAspectRatio: false } }); } function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); } initMainChart(); <\/script></body></html>`;
+            const blob = new Blob([htmlContent], { type: "text/html" });
+            const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Relatorio_Grupo.html`;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("Relatório do grupo baixado!");
         }
 
         function downloadErrors() {
             if (processedErrors.length === 0) return;
             const ws = XLSX.utils.json_to_sheet(processedErrors);
-            const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, "Erros");
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Erros");
             XLSX.writeFile(wb, "Relatorio_Erros_Auditados.xlsx");
             showToast("Planilha de erros baixada com sucesso!");
         }
-
         document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
     </script>
 </body>
