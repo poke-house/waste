@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Desperdícios - V35 </title>
+    <title>Dashboard Desperdícios - V36 </title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -36,7 +36,7 @@
                 <i class="fas fa-lock text-2xl text-indigo-600"></i>
             </div>
             <h2 class="text-2xl font-bold text-slate-800 mb-1">Acesso Restrito</h2>
-            <p class="text-sm text-slate-500 mb-6"> 🐟 </p>
+            <p class="text-sm text-slate-500 mb-6"> </p>
             
             <input type="password" id="pin-input" maxlength="4" placeholder="••••" autocomplete="off"
                    class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-3xl tracking-[0.5em] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none mb-4 transition-all">
@@ -85,8 +85,8 @@
         <div class="max-w-[98%] mx-auto">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-slate-900">Waste Events</h1>
-                    <p class="text-slate-500 text-sm mt-1">Version 35</p>
+                    <h1 class="text-3xl font-bold text-slate-900">Desperdícios</h1>
+                    <p class="text-slate-500 text-sm mt-1">Versão 36 </p>
                 </div>
                 <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                     <i class="fas fa-sync-alt mr-2"></i> Encerrar Sessão / Atualizar
@@ -283,9 +283,9 @@
                     lock.classList.add('hidden');
                     const main = document.getElementById('main-dashboard');
                     main.classList.remove('hidden');
-                    setTimeout(() => main.classList.remove('opacity-0'), 50); // Fade in suave
+                    setTimeout(() => main.classList.remove('opacity-0'), 50);
                     showToast("Acesso autorizado.", "success");
-                }, 500); // Aguarda a transição CSS do lock terminar
+                }, 500); 
             } else {
                 const err = document.getElementById('pin-error');
                 err.classList.remove('opacity-0');
@@ -337,7 +337,7 @@
         let currentEvolutionMode = 'weekly';
         let currentModalContext = { title: "", items: [] };
 
-        // --- UPLOAD COM PROGRESSO (CHAIN ASSÍNCRONO PARA FLUIDEZ UI) ---
+        // --- UPLOAD COM PROGRESSO E CSV ROBUSTO ---
         const dropZone = document.getElementById('drop-zone'), fileInput = document.getElementById('file-input');
         dropZone.addEventListener('click', () => fileInput.click());
         dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('active'); });
@@ -354,7 +354,6 @@
         function handleFile(file) {
             document.getElementById('upload-section').classList.add('loading');
             
-            // Esconde estado inicial da dropzone, mostra container de progresso
             document.getElementById('drop-content').classList.add('hidden');
             document.getElementById('progress-container').classList.remove('hidden');
             
@@ -364,7 +363,7 @@
             
             reader.onprogress = (e) => {
                 if (e.lengthComputable) {
-                    const percent = (e.loaded / e.total) * 40; // Leitura bruta até 40%
+                    const percent = (e.loaded / e.total) * 40; 
                     updateProgress(percent, "Carregando bytes...");
                 }
             };
@@ -372,23 +371,25 @@
             reader.onload = (e) => {
                 updateProgress(50, "Montando estrutura (Processamento pesado)...");
                 
-                // Micropausa 1 para o navegador atualizar o DOM (barra de progresso)
                 setTimeout(() => {
                     try {
-                        const data = new Uint8Array(e.target.result);
-                        updateProgress(65, "Lendo abas do Excel...");
+                        updateProgress(65, "Lendo abas do arquivo...");
                         
-                        // Micropausa 2 (XLSX.read é bloqueante)
                         setTimeout(() => {
-                            const workbook = XLSX.read(data, { type: 'array' });
+                            let workbook;
+                            // PATCH: Leitura robusta separando CSV de Excel Buffer
+                            if (file.name.toLowerCase().endsWith('.csv')) {
+                                workbook = XLSX.read(e.target.result, { type: 'string', raw: false });
+                            } else {
+                                const data = new Uint8Array(e.target.result);
+                                workbook = XLSX.read(data, { type: 'array' });
+                            }
                             updateProgress(80, "Extraindo as linhas de dados...");
                             
-                            // Micropausa 3 (sheet_to_json é bloqueante)
                             setTimeout(() => {
                                 rawData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { defval: "", cellDates: true, raw: false });
                                 updateProgress(90, "Limpando e padronizando os textos...");
                                 
-                                // Micropausa 4 (Normalização)
                                 setTimeout(() => {
                                     rawData = rawData.map(row => {
                                         const newRow = {};
@@ -400,21 +401,19 @@
                                     
                                     updateProgress(100, "Concluído! Desenhando gráficos...");
                                     
-                                    // Finalização e Reset visual
                                     setTimeout(() => {
                                         initializeDashboard();
                                         showToast("Análise carregada com sucesso!", "success");
                                         
-                                        // Restaura UI para permitir novos uploads facilmente
                                         document.getElementById('progress-container').classList.add('hidden');
                                         document.getElementById('drop-content').classList.remove('hidden');
                                         document.getElementById('upload-section').classList.remove('loading');
-                                        fileInput.value = ""; // limpa o input
+                                        fileInput.value = ""; 
                                     }, 200);
 
-                                }, 50); // Timeout normalização
-                            }, 50); // Timeout sheet_to_json
-                        }, 50); // Timeout XLSX read
+                                }, 50); 
+                            }, 50); 
+                        }, 50); 
                     } catch (err) { 
                         showToast("Erro ao processar arquivo: " + err.message, "error");
                         document.getElementById('progress-container').classList.add('hidden');
@@ -425,7 +424,12 @@
                 }, 50);
             };
             
-            reader.readAsArrayBuffer(file);
+            // PATCH: Call readAsText for csv or readAsArrayBuffer for xlsx
+            if (file.name.toLowerCase().endsWith('.csv')) {
+                reader.readAsText(file, 'utf-8');
+            } else {
+                reader.readAsArrayBuffer(file);
+            }
         }
 
         // --- SISTEMA CORE (DASHBOARD) ---
@@ -438,7 +442,7 @@
             uniqueStores.forEach(s => storeToAMMap[s] = identifyAM(s));
             renderCheckboxes();
             applyFilters();
-            document.getElementById('upload-section').classList.add('hidden'); // Oculta upload após primeiro sucesso
+            document.getElementById('upload-section').classList.add('hidden'); 
             document.getElementById('filter-section').classList.remove('hidden');
             document.getElementById('dashboard-content').classList.remove('hidden');
             document.getElementById('results-section').classList.remove('hidden');
@@ -464,11 +468,36 @@
             });
         }
 
+        // PATCH: Toggle global seguro afeta apenas os checkboxes correctos
         function toggleGroup(am, state) { document.querySelectorAll(`.am-${am}`).forEach(cb => cb.checked = state); }
-        function toggleGlobal(state) { document.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = state); }
+        function toggleGlobal(state) { 
+            document.querySelectorAll('.store-cb').forEach(cb => cb.checked = state); 
+            document.querySelectorAll('.am-master').forEach(cb => cb.checked = state); 
+        }
         function applyFilters() { const selected = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value); runAudit(rawData.filter(r => selected.includes(r['Buyer'])), selected); }
 
-        function parseDate(val) { if (val instanceof Date) return val; if (typeof val === 'string' && val.split(/[\/\-]/).length === 3) { const p = val.trim().split(/[\/\-]/); return new Date(p[2], p[1]-1, p[0]); } return null; }
+        // PATCH: ParseDate mais robusto suportando serial e múltiplos strings
+        function parseDate(val) {
+            if (!val) return null;
+            if (val instanceof Date && !isNaN(val)) return val;
+            if (typeof val === 'number') {
+                return new Date(Math.round((val - 25569) * 86400 * 1000));
+            }
+            if (typeof val === 'string') {
+                let dStr = val.trim().split(' ')[0]; 
+                if (dStr.includes('T')) dStr = dStr.split('T')[0];
+                const p = dStr.split(/[\/\-]/);
+                if (p.length === 3) {
+                    let y, m, d;
+                    if (p[0].length === 4) { y = p[0]; m = p[1]; d = p[2]; } 
+                    else { d = p[0]; m = p[1]; y = p[2]; } 
+                    const parsed = new Date(y, m - 1, d);
+                    if (!isNaN(parsed)) return parsed;
+                }
+            }
+            return null;
+        }
+
         function getLocalISO(date) { const offset = date.getTimezoneOffset(); const localDate = new Date(date.getTime() - (offset * 60 * 1000)); return localDate.toISOString().split('T')[0]; }
         function getWeekLabel(date) { const d = new Date(date); const day = d.getDay(); const diff = d.getDate() - day + (day == 0 ? -6 : 1); const monday = new Date(d.setDate(diff)); const sunday = new Date(monday); sunday.setDate(monday.getDate() + 6); return { label: `${monday.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit'})} - ${sunday.toLocaleDateString('pt-PT', {day:'2-digit', month:'2-digit'})}`, sortKey: monday.getTime() }; }
 
@@ -506,6 +535,7 @@
             data.forEach(row => {
                 const buyer = row['Buyer'] || "N/A";
                 let date = parseDate(row['Date']);
+                
                 if (date) {
                     if (startDate && date < startDate) return;
                     if (endDate && date > endDate) return;
@@ -517,15 +547,20 @@
                 globalTotalVal += val;
 
                 const localIso = date ? getLocalISO(date) : null;
+
+                // PATCH: Adição da trackagem de dias únicos para metas mensais e semanais dinâmicas
                 if (date) {
                     evolutionDataStore.daily[localIso] = (evolutionDataStore.daily[localIso] || 0) + val;
                     const week = getWeekLabel(date);
-                    if (!evolutionDataStore.weekly[week.label]) evolutionDataStore.weekly[week.label] = { val: 0, sort: week.sortKey };
+                    if (!evolutionDataStore.weekly[week.label]) evolutionDataStore.weekly[week.label] = { val: 0, sort: week.sortKey, uniqueDays: new Set() };
                     evolutionDataStore.weekly[week.label].val += val;
+                    evolutionDataStore.weekly[week.label].uniqueDays.add(localIso);
+                    
                     const monthKey = date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' });
                     const monthSort = date.getFullYear() * 100 + date.getMonth();
-                    if (!evolutionDataStore.monthly[monthKey]) evolutionDataStore.monthly[monthKey] = { val: 0, sort: monthSort };
+                    if (!evolutionDataStore.monthly[monthKey]) evolutionDataStore.monthly[monthKey] = { val: 0, sort: monthSort, uniqueDays: new Set() };
                     evolutionDataStore.monthly[monthKey].val += val;
+                    evolutionDataStore.monthly[monthKey].uniqueDays.add(localIso);
                 }
 
                 const name = String(row['Item name']||"").trim(), type = String(row['Item type']||"").trim(), desc = String(row['Description']||"").trim();
@@ -560,9 +595,16 @@
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
-            let minDate, maxDate;
-            if (startDate) { minDate = startDate; maxDate = endDate ? endDate : (allValidDates.length > 0 ? allValidDates.sort((a,b)=>a-b)[allValidDates.length-1] : startDate); } 
-            else { if (allValidDates.length > 0) { allValidDates.sort((a,b) => a-b); minDate = allValidDates[0]; maxDate = allValidDates[allValidDates.length-1]; } }
+            // PATCH: Organização consistente das datas globais
+            if (allValidDates.length > 0) {
+                allValidDates.sort((a,b) => a.getTime() - b.getTime());
+            }
+            
+            let minDate = startDate || (allValidDates.length > 0 ? allValidDates[0] : null);
+            let maxDate = endDate || (allValidDates.length > 0 ? allValidDates[allValidDates.length - 1] : null);
+
+            globalMinDate = minDate;
+            globalMaxDate = maxDate;
 
             if (minDate && maxDate) {
                 document.getElementById('period-start').innerText = minDate.toLocaleDateString('pt-PT');
@@ -573,7 +615,9 @@
                 document.getElementById('missing-dates-log').innerHTML = '<p class="text-center text-slate-400">Sem datas.</p>';
             }
             
-            renderAnomalies(calculateAnomalies(allItemsFlat)); updateMainCharts(productTotalWaste, trendData, storeTotalWaste); renderEvolutionChart(currentEvolutionMode);
+            renderAnomalies(calculateAnomalies(allItemsFlat)); 
+            updateMainCharts(productTotalWaste, trendData, storeTotalWaste); 
+            renderEvolutionChart(currentEvolutionMode);
         }
 
         function checkMissingDates(min, max, activeStores) {
@@ -602,12 +646,17 @@
             const activeStores = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             let dailyTotalTarget = activeStores.length * globalStoreDailyTarget;
 
+            // PATCH: A meta multiplica pelo número real de dias mapeados para aquela barra se existir set uniqueDays
             if (mode === 'daily') {
                 rawKeys = Object.keys(evolutionDataStore.daily).sort(); labels = rawKeys.map(k => k.split('-').reverse().slice(0,2).join('/')); values = rawKeys.map(k => evolutionDataStore.daily[k]); targetValues = labels.map(() => dailyTotalTarget);
             } else if (mode === 'weekly') {
-                const sortedEntries = Object.entries(evolutionDataStore.weekly).sort((a,b) => a[1].sort - b[1].sort); labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val); targetValues = labels.map(() => dailyTotalTarget * 7);
+                const sortedEntries = Object.entries(evolutionDataStore.weekly).sort((a,b) => a[1].sort - b[1].sort); 
+                labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val); 
+                targetValues = sortedEntries.map(e => dailyTotalTarget * (e[1].uniqueDays ? e[1].uniqueDays.size : 7));
             } else if (mode === 'monthly') {
-                const sortedEntries = Object.entries(evolutionDataStore.monthly).sort((a,b) => a[1].sort - b[1].sort); labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val); targetValues = labels.map(() => dailyTotalTarget * 30);
+                const sortedEntries = Object.entries(evolutionDataStore.monthly).sort((a,b) => a[1].sort - b[1].sort); 
+                labels = sortedEntries.map(e => e[0]); rawKeys = labels; values = sortedEntries.map(e => e[1].val); 
+                targetValues = sortedEntries.map(e => dailyTotalTarget * (e[1].uniqueDays ? e[1].uniqueDays.size : 30));
             }
 
             const withinTarget = values.map((v, i) => Math.min(v, targetValues[i])); const overTarget = values.map((v, i) => Math.max(0, v - targetValues[i]));
@@ -676,11 +725,15 @@
             const htmlContent = `<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Consolidado</title><script src="https://cdn.tailwindcss.com"><\/script><script src="https://cdn.jsdelivr.net/npm/chart.js"><\/script><style>.modal{transition:opacity 0.25s ease}body.modal-active{overflow-x:hidden;overflow-y:hidden!important}</style></head><body class="p-6 text-slate-800"><div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50"><div class="absolute w-full h-full bg-slate-900 opacity-75" onclick="closeModal()"></div><div class="bg-white w-11/12 md:max-w-5xl mx-auto rounded-xl shadow-2xl z-50 overflow-hidden flex flex-col max-h-[90vh]"><div class="py-4 px-6 bg-slate-50 border-b flex justify-between"><button id="btn-back-level" onclick="openStoreModal(currentStoreName)" class="hidden bg-white border px-3 py-1 rounded text-sm">Voltar</button><p class="text-xl font-bold" id="modal-title">Loja</p><div class="cursor-pointer" onclick="closeModal()">X</div></div><div class="p-6 flex-1 overflow-y-auto"><div class="relative h-[500px] w-full"><canvas id="modalChart"></canvas></div></div></div></div><div class="max-w-6xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden"><div class="bg-slate-800 text-white p-6 flex justify-between"><div><h1 class="text-2xl font-bold">Relatório Consolidado</h1><p class="text-slate-300 text-sm">Período: ${pStart} até ${pEnd}</p></div><button onclick="window.print()" class="bg-slate-600 px-3 py-1 rounded text-sm">Imprimir</button></div><div class="p-6"><div class="relative h-[600px] w-full"><canvas id="mainChart"></canvas></div></div></div><script>const groupData=${JSON.stringify(groupItems)}, minD="${minD}", maxD="${maxD}"; const pTargets={"ARROZ SUSHI_RFU":6,"ARROZ NEGRO_RFU":4.5,"FRANGO_RFU":3,"SALMON FILLET_RFU":3,"CAMARÃO CROCANTE_RFU":3,"CAMARÃO CROCANTE":3}; let mainChart=null, modalChart=null, currentStoreName=null; function initMainChart(){ const aggStores={}; Object.keys(groupData).forEach(s => { aggStores[s] = groupData[s].reduce((sum, i) => sum + i.val, 0); }); const sortedStores = Object.entries(aggStores).sort((a,b)=>b[1]-a[1]); mainChart = new Chart(document.getElementById('mainChart').getContext('2d'), { type: 'bar', data: { labels: sortedStores.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedStores.map(x=>x[1]), backgroundColor: '#4f46e5' }] }, options: { responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) openStoreModal(sortedStores[el[0].index][0]);}, onHover:(e,el)=>e.native.target.style.cursor=el[0]?'pointer':'default' } }); } function openStoreModal(storeName){ currentStoreName = storeName; document.getElementById('modal-title').innerText = storeName; document.getElementById('btn-back-level').classList.add('hidden'); document.getElementById('details-modal').classList.remove('opacity-0', 'pointer-events-none'); document.body.classList.add('modal-active'); const items = groupData[storeName] || []; const agg = {}; items.forEach(i=>agg[i.name]=(agg[i.name]||0)+i.val); const sorted = Object.entries(agg).map(([n,v])=>({name:n,val:v})).sort((a,b)=>b.val-a.val); const total = sorted.length; const bgColors = sorted.map((_,i)=> i<total/3 ? '#ef4444' : (i<(total*2)/3 ? '#eab308' : '#22c55e')); if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart').getContext('2d'), { type: 'bar', data: { labels: sorted.map(x=>x.name), datasets: [{ label: 'Valor (€)', data: sorted.map(x=>x.val), backgroundColor: bgColors }] }, options: { indexAxis:'y', responsive: true, maintainAspectRatio: false, onClick: (e,el)=>{if(el.length) showDaily(sorted[el[0].index].name);} } }); } function showDaily(prodName){ document.getElementById('modal-title').innerText = prodName + " (" + currentStoreName + ")"; document.getElementById('btn-back-level').classList.remove('hidden'); const items = groupData[currentStoreName].filter(i=>i.name===prodName); const dMap={}; items.forEach(i=>{if(i.dateStr) dMap[i.dateStr]=(dMap[i.dateStr]||0)+i.val}); const lbl=[], dat=[]; if(minD&&maxD){let cur=new Date(minD),end=new Date(maxD);while(cur<=end){const offset=cur.getTimezoneOffset();const localDate=new Date(cur.getTime()-(offset*60*1000));const iso=localDate.toISOString().split('T')[0];lbl.push(cur.toLocaleDateString('pt-PT').slice(0,5));dat.push(dMap[iso]||0);cur.setDate(cur.getDate()+1);}} const pKey=prodName.toUpperCase(); let base=0; for(let k in pTargets){if(pKey.includes(k))base=pTargets[k];} const within=dat.map(v=>base>0?Math.min(v,base):v); const over=dat.map(v=>base>0?Math.max(0,v-base):0); if(modalChart) modalChart.destroy(); modalChart = new Chart(document.getElementById('modalChart'), { type: 'bar', data: { labels: lbl, datasets: [{ label: 'Dentro da Meta (€)', data: within, backgroundColor: '#3b82f6', stack:'S0' },{ label: 'Acima da Meta (€)', data: over, backgroundColor: '#ef4444', stack:'S0' }] }, options: { responsive: true, maintainAspectRatio: false, scales: {x:{stacked:true},y:{stacked:true}} } }); } function closeModal(){ document.getElementById('details-modal').classList.add('opacity-0', 'pointer-events-none'); document.body.classList.remove('modal-active'); } initMainChart(); <\/script></body></html>`;
             const blob = new Blob([htmlContent], { type: "text/html" }); const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = `Relatorio_Grupo.html`; document.body.appendChild(a); a.click(); document.body.removeChild(a); showToast("Relatório do grupo baixado!");
         }
-        function downloadErrors() { if (processedErrors.length === 0) return; const ws = XLSX.utils.json_to_sheet(processedErrors); const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Erros"); XLSX.writeFile(wb, "Relatorio_Erros.xlsx"); showToast("Planilha baixada!"); }
+
+        function downloadErrors() {
+            if (processedErrors.length === 0) return;
+            const ws = XLSX.utils.json_to_sheet(processedErrors);
+            const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, "Erros");
+            XLSX.writeFile(wb, "Relatorio_Erros.xlsx");
+            showToast("Planilha baixada!");
+        }
         document.onkeydown = function(evt) { if (evt.key === "Escape") closeModal(); };
     </script>
 </body>
 </html>
-
-
-
