@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-PT">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Desperdícios - Plataforma Final</title>
+    
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪣</text></svg>">
-    <title>Dashboard Desperdícios - V36 </title>
     
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
@@ -27,6 +28,7 @@
         /* Ocultar as setas do input number do PIN */
         input[type=number]::-webkit-inner-spin-button, 
         input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+        input[type=password] { letter-spacing: 0.5em; text-align: center; }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800">
@@ -37,10 +39,10 @@
                 <i class="fas fa-lock text-2xl text-indigo-600"></i>
             </div>
             <h2 class="text-2xl font-bold text-slate-800 mb-1">Acesso Restrito</h2>
-            <p class="text-sm text-slate-500 mb-6"> </p>
+            <p class="text-sm text-slate-500 mb-6">Insira o PIN numérico para aceder ao painel.</p>
             
             <input type="password" id="pin-input" maxlength="4" placeholder="••••" autocomplete="off"
-                   class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-3xl tracking-[0.5em] focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none mb-4 transition-all">
+                   class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none mb-4 transition-all">
             
             <button onclick="unlockDashboard()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center">
                 Desbloquear <i class="fas fa-arrow-right ml-2"></i>
@@ -86,8 +88,8 @@
         <div class="max-w-[98%] mx-auto">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
                 <div>
-                    <h1 class="text-3xl font-bold text-slate-900">Desperdícios</h1>
-                    <p class="text-slate-500 text-sm mt-1">Versão 36 </p>
+                    <h1 class="text-3xl font-bold text-slate-900">Auditoria de Desperdícios</h1>
+                    <p class="text-slate-500 text-sm mt-1">Plataforma Consolidada (Regras Estritas).</p>
                 </div>
                 <button onclick="window.location.reload()" class="bg-white border border-slate-300 px-4 py-2 rounded shadow-sm text-sm hover:bg-slate-50">
                     <i class="fas fa-sync-alt mr-2"></i> Encerrar Sessão / Atualizar
@@ -99,8 +101,8 @@
                     
                     <div id="drop-content" class="flex flex-col items-center justify-center">
                         <i class="fas fa-file-excel text-4xl text-blue-500 mb-3"></i>
-                        <h3 class="font-bold text-lg text-slate-700">Carregar Planilha</h3>
-                        <p class="text-slate-500 text-sm">Arraste o arquivo (.xlsx, .csv) aqui ou clique</p>
+                        <h3 class="font-bold text-lg text-slate-700">Carregar Ficheiro</h3>
+                        <p class="text-slate-500 text-sm">Arraste o ficheiro (.xlsx, .csv) aqui ou clique</p>
                     </div>
 
                     <div id="progress-container" class="hidden absolute inset-0 bg-white/95 flex flex-col justify-center px-10">
@@ -163,7 +165,7 @@
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500 flex justify-between items-center">
                         <div>
-                            <p class="text-xs text-red-400 uppercase font-bold">Erros de Tipagem</p>
+                            <p class="text-xs text-red-400 uppercase font-bold">Erros de Lançamento</p>
                             <h3 class="text-3xl font-bold text-red-600" id="total-errors">0</h3>
                             <p class="text-xs text-slate-400 mt-1" id="error-value-subtext">Valor: € 0,00</p>
                         </div>
@@ -265,7 +267,7 @@
         // --- 0. LÓGICA DA TELA DE BLOQUEIO (PIN) ---
         window.onload = () => { 
             if(typeof XLSX === 'undefined') {
-                document.getElementById('lock-screen').innerHTML = '<div class="bg-white p-8 rounded text-center"><h2 class="text-red-500 font-bold text-xl mb-2">Erro de Conexão</h2><p>Não foi possível carregar as bibliotecas. Verifique a internet.</p></div>';
+                document.getElementById('lock-screen').innerHTML = '<div class="bg-white p-8 rounded text-center"><h2 class="text-red-500 font-bold text-xl mb-2">Erro de Conexão</h2><p>Não foi possível carregar as bibliotecas. Verifique a sua internet.</p></div>';
             } else {
                 document.getElementById('pin-input').focus(); 
             }
@@ -309,13 +311,77 @@
             setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 500); }, 4000);
         }
 
-        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO ---
+        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO (ATUALIZADO E BLINDADO) ---
         const validationRules = [
-            { id: "CPK_IN_NAME", check: (item) => item.name.toUpperCase().includes("CPK"), message: () => "Nome contém 'CPK'" },
-            { id: "INVALID_TYPE", check: (item) => !["purchase", "sub-recipe", "inventory item", "preparation"].includes(item.type.toLowerCase()), message: (item) => item.type.toLowerCase() === "menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${item.type})` },
-            { id: "PREPARATION_END_OF_DAY", check: (item) => item.type.toLowerCase() === "preparation" && item.desc.toLowerCase() !== "end of day", message: () => "PREPARATION deve ser 'End of Day'" },
-            { id: "RFU_RULES", check: (item) => { if (!item.name.toUpperCase().includes("RFU")) return false; const t = item.type.toLowerCase(), d = item.desc.toLowerCase(); if (t !== "sub-recipe" && t !== "preparation") return true; if (t === "sub-recipe") { if (d !== "end of day" && !d.includes("expired") && !d.includes("spoiled")) return true; } return false; }, message: (item) => { if (!["sub-recipe", "preparation"].includes(item.type.toLowerCase())) return "RFU deve ser Sub-recipe ou Preparation"; return "RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'"; } },
-            { id: "RICE_RULES", check: (item) => { const name = item.name.toUpperCase(); const isRice = ["ARROZ BASMATI", "ARROZ INTEGRAL", "ARROZ NEGRO", "ARROZ SUSHI"].some(r => name.includes(r)); if (!isRice) return false; const t = item.type.toLowerCase(), d = item.desc.toLowerCase(), hasRFU = name.includes("RFU"); if (hasRFU) { if (t !== "sub-recipe" || d !== "end of day") return true; } else { if (t !== "inventory item" && t !== "purchase") return true; if (!d.includes("expired") && !d.includes("spoiled") && !d.includes("dropped") && !d.includes("broken")) return true; } return false; }, message: (item) => { if (item.name.toUpperCase().includes("RFU")) return "Arroz com RFU deve ser tipo 'Sub-recipe' e descrição 'End of day'"; else return "Arroz sem RFU deve ser tipo 'Inventory item' com descrição de perda (Expired, Spoiled, Dropped, Broken)"; } }
+            { 
+                id: "CPK_IN_NAME", 
+                check: (item) => item.name.toUpperCase().includes("CPK"), 
+                message: () => "Nome contém 'CPK'" 
+            },
+            { 
+                id: "INVALID_TYPE", 
+                check: (item) => !["purchase", "sub-recipe", "subrecipe", "inventory item", "preparation"].includes(item.type.toLowerCase()), 
+                message: (item) => item.type.toLowerCase() === "menu item" ? "MENU ITEM deve ser Inventory Item ou Purchase" : `Tipo Inválido (${item.type})` 
+            },
+            { 
+                id: "PREPARATION_END_OF_DAY", 
+                check: (item) => item.type.toLowerCase() === "preparation" && item.desc.toLowerCase() !== "end of day", 
+                message: () => "PREPARATION deve ser 'End of Day'" 
+            },
+            { 
+                id: "RFU_RULES", 
+                check: (item) => { 
+                    if (!item.name.toUpperCase().includes("RFU")) return false; 
+                    const t = item.type.toLowerCase();
+                    const d = item.desc.toLowerCase(); 
+                    if (t !== "sub-recipe" && t !== "subrecipe" && t !== "preparation") return true; 
+                    if (t === "sub-recipe" || t === "subrecipe") { 
+                        if (d !== "end of day" && !d.includes("expired") && !d.includes("spoiled")) return true; 
+                    } 
+                    return false; 
+                }, 
+                message: (item) => { 
+                    const t = item.type.toLowerCase();
+                    if (!["sub-recipe", "subrecipe", "preparation"].includes(t)) return "RFU deve ser Sub-recipe ou Preparation"; 
+                    return "RFU (Sub-recipe) deve ser 'End of Day' ou 'Expired/Spoiled'"; 
+                } 
+            },
+            { 
+                id: "RICE_RULES", 
+                check: (item) => { 
+                    const name = item.name.toUpperCase(); 
+                    const isRice = ["BASMATI", "INTEGRAL", "NEGRO", "SUSHI"].some(r => name.includes("ARROZ") && name.includes(r)); 
+                    if (!isRice) return false; 
+                    
+                    const t = item.type.toLowerCase();
+                    const d = item.desc.toLowerCase();
+                    const hasRFU = name.includes("RFU"); 
+                    
+                    if (hasRFU) { 
+                        if ((t !== "sub-recipe" && t !== "subrecipe") || d !== "end of day") return true; 
+                    } else { 
+                        if (t !== "inventory item") return true; 
+                        if (!d.includes("expired") && !d.includes("spoiled") && !d.includes("dropped") && !d.includes("broken")) return true; 
+                    } 
+                    return false; 
+                }, 
+                message: (item) => { 
+                    if (item.name.toUpperCase().includes("RFU")) return "Arroz (RFU) exige ESTRITAMENTE tipo 'Sub-recipe' e desc. 'End of day'"; 
+                    else return "Arroz (sem RFU) exige ESTRITAMENTE tipo 'Inventory item' e desc. de perda (Expired/Spoiled/Dropped/Broken)"; 
+                } 
+            },
+            {
+                id: "RAW_MATERIAL_NOT_EOD",
+                check: (item) => {
+                    const t = item.type.toLowerCase();
+                    const d = item.desc.toLowerCase();
+                    if (t === "purchase" || t === "inventory item") {
+                        if (d === "end of day") return true;
+                    }
+                    return false;
+                },
+                message: () => "Itens 'Purchase' ou 'Inventory item' NUNCA podem ser 'End of day' (Use Expired, Spoiled, Dropped, etc.)"
+            }
         ];
 
         // --- CONFIGURAÇÕES ---
@@ -354,11 +420,10 @@
 
         function handleFile(file) {
             document.getElementById('upload-section').classList.add('loading');
-            
             document.getElementById('drop-content').classList.add('hidden');
             document.getElementById('progress-container').classList.remove('hidden');
             
-            updateProgress(0, "Iniciando leitura do arquivo...");
+            updateProgress(0, "Iniciando leitura do ficheiro...");
 
             const reader = new FileReader();
             
@@ -374,11 +439,10 @@
                 
                 setTimeout(() => {
                     try {
-                        updateProgress(65, "Lendo abas do arquivo...");
+                        updateProgress(65, "Lendo abas do ficheiro...");
                         
                         setTimeout(() => {
                             let workbook;
-                            // PATCH: Leitura robusta separando CSV de Excel Buffer
                             if (file.name.toLowerCase().endsWith('.csv')) {
                                 workbook = XLSX.read(e.target.result, { type: 'string', raw: false });
                             } else {
@@ -400,7 +464,7 @@
                                     
                                     if (!rawData.length) throw new Error("A planilha está vazia ou corrompida.");
                                     
-                                    updateProgress(100, "Concluído! Desenhando gráficos...");
+                                    updateProgress(100, "Concluído! A gerar os gráficos...");
                                     
                                     setTimeout(() => {
                                         initializeDashboard();
@@ -416,7 +480,7 @@
                             }, 50); 
                         }, 50); 
                     } catch (err) { 
-                        showToast("Erro ao processar arquivo: " + err.message, "error");
+                        showToast("Erro ao processar ficheiro: " + err.message, "error");
                         document.getElementById('progress-container').classList.add('hidden');
                         document.getElementById('drop-content').classList.remove('hidden');
                         document.getElementById('upload-section').classList.remove('loading');
@@ -425,7 +489,6 @@
                 }, 50);
             };
             
-            // PATCH: Call readAsText for csv or readAsArrayBuffer for xlsx
             if (file.name.toLowerCase().endsWith('.csv')) {
                 reader.readAsText(file, 'utf-8');
             } else {
@@ -469,7 +532,6 @@
             });
         }
 
-        // PATCH: Toggle global seguro afeta apenas os checkboxes correctos
         function toggleGroup(am, state) { document.querySelectorAll(`.am-${am}`).forEach(cb => cb.checked = state); }
         function toggleGlobal(state) { 
             document.querySelectorAll('.store-cb').forEach(cb => cb.checked = state); 
@@ -477,7 +539,6 @@
         }
         function applyFilters() { const selected = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value); runAudit(rawData.filter(r => selected.includes(r['Buyer'])), selected); }
 
-        // PATCH: ParseDate mais robusto suportando serial e múltiplos strings
         function parseDate(val) {
             if (!val) return null;
             if (val instanceof Date && !isNaN(val)) return val;
@@ -549,7 +610,6 @@
 
                 const localIso = date ? getLocalISO(date) : null;
 
-                // PATCH: Adição da trackagem de dias únicos para metas mensais e semanais dinâmicas
                 if (date) {
                     evolutionDataStore.daily[localIso] = (evolutionDataStore.daily[localIso] || 0) + val;
                     const week = getWeekLabel(date);
@@ -596,7 +656,6 @@
             document.getElementById('global-total-value').innerText = "€ " + globalTotalVal.toLocaleString('pt-PT', {minimumFractionDigits: 2});
             document.getElementById('btn-download').style.display = totalErrCount ? 'inline-flex' : 'none';
 
-            // PATCH: Organização consistente das datas globais
             if (allValidDates.length > 0) {
                 allValidDates.sort((a,b) => a.getTime() - b.getTime());
             }
@@ -647,7 +706,6 @@
             const activeStores = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             let dailyTotalTarget = activeStores.length * globalStoreDailyTarget;
 
-            // PATCH: A meta multiplica pelo número real de dias mapeados para aquela barra se existir set uniqueDays
             if (mode === 'daily') {
                 rawKeys = Object.keys(evolutionDataStore.daily).sort(); labels = rawKeys.map(k => k.split('-').reverse().slice(0,2).join('/')); values = rawKeys.map(k => evolutionDataStore.daily[k]); targetValues = labels.map(() => dailyTotalTarget);
             } else if (mode === 'weekly') {
@@ -738,4 +796,3 @@
     </script>
 </body>
 </html>
-
