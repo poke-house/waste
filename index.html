@@ -328,7 +328,7 @@
             setTimeout(() => { toast.classList.add('translate-x-full', 'opacity-0'); setTimeout(() => toast.remove(), 500); }, 4000);
         }
 
-        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO (ATUALIZADO E BLINDADO) ---
+        // --- 1. DICIONÁRIO DE REGRAS DE VALIDAÇÃO ---
         const validationRules = [
             { 
                 id: "CPK_IN_NAME", 
@@ -404,9 +404,9 @@
         // --- CONFIGURAÇÕES ---
         const amConfig = {
             "Sulamita": ["PT001", "PT002", "PT004", "PT009", "PT015", "PT023", "PT029"],
-            "Marcelo": ["PT006", "PT008", "PT010", "PT018", "PT012", "NOVA", "OEIRAS", "SINTRA"],
+            "Marcelo": ["PT006", "PT008", "PT010", "PT012", "NOVA", "OEIRAS", "SINTRA"], // Removido Almada (PT018), adicionadas novas
             "Monique": ["PT013", "PT014", "PT016", "PT017", "PT019", "PT021"],
-            "José": ["PT003", "PT005", "PT011", "PT020", "PT022", "PT024", "PT026", "PT028", "PT030"]
+            "José": ["PT003", "PT005", "PT011", "PT020", "PT022", "PT024", "PT026", "PT028", "PT030", "PT018", "ALMADA", "UBBO", "COMPORTA"] // Adicionado PT018 (Almada), UBBO, COMPORTA
         };
         const amHexColors = { "Sulamita": "#7c3aed", "Marcelo": "#2563eb", "Monique": "#db2777", "José": "#ea580c", "Outros": "#64748b" };
         const amTailwindColors = { "Sulamita": "border-violet-500 text-violet-700 bg-violet-50", "Marcelo": "border-blue-500 text-blue-700 bg-blue-50", "Monique": "border-pink-500 text-pink-700 bg-pink-50", "José": "border-orange-500 text-orange-700 bg-orange-50", "Outros": "border-slate-400 text-slate-600 bg-slate-100" };
@@ -537,7 +537,7 @@
                 if (!buckets[am].length && am === "Outros") return;
                 const color = amTailwindColors[am];
                 
-                // --- PATCH: Seleção Padrão para Marcelo ---
+                // --- Seleção padrão para o Marcelo ---
                 const isChecked = am === "Marcelo" ? "checked" : "";
                 
                 container.innerHTML += `
