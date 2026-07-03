@@ -174,7 +174,8 @@
                 </div>
 
                 <!-- KPIs -->
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+                    <!-- Erros de Lançamento -->
                     <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-red-500 flex justify-between items-center">
                         <div>
                             <p class="text-xs text-red-400 uppercase font-bold">Erros de Lançamento</p>
@@ -184,6 +185,7 @@
                         <i class="fas fa-times-circle text-red-100 text-3xl"></i>
                     </div>
                     
+                    <!-- Dias Faltantes -->
                     <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-amber-500 flex flex-col">
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-xs text-amber-600 uppercase font-bold flex items-center"><i class="fas fa-exclamation-circle mr-1"></i> Dias Faltantes</p>
@@ -193,13 +195,23 @@
                         </div>
                     </div>
 
-                    <!-- ANOMALIAS (ITENS ÚNICOS) -->
+                    <!-- Anomalias -->
                     <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-purple-500 flex flex-col">
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-xs text-purple-600 uppercase font-bold flex items-center"><i class="fas fa-search-minus mr-1"></i> Anomalias (Itens Únicos)</p>
                         </div>
                         <div class="bg-purple-50 rounded text-[11px] text-purple-900 overflow-y-auto h-16 custom-scroll p-2 border border-purple-100" id="anomalies-log">
                             <p class="text-center italic text-slate-400 mt-4">Procurando itens únicos...</p>
+                        </div>
+                    </div>
+
+                    <!-- Custo Zero (NOVO) -->
+                    <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-cyan-500 flex flex-col">
+                        <div class="flex justify-between items-center mb-2">
+                            <p class="text-xs text-cyan-600 uppercase font-bold flex items-center"><i class="fas fa-search-dollar mr-1"></i> Custo Zero (€0,00)</p>
+                        </div>
+                        <div class="bg-cyan-50 rounded text-[11px] text-cyan-900 overflow-y-auto h-16 custom-scroll p-2 border border-cyan-100" id="zero-cost-log">
+                            <p class="text-center italic text-slate-400 mt-4">A procurar custos zerados...</p>
                         </div>
                     </div>
                 </div>
@@ -612,10 +624,31 @@
             });
         }
 
+        // --- NOVO: RENDERIZAR CUSTOS ZERO ---
+        function renderZeroCost(items) {
+            const log = document.getElementById('zero-cost-log'); log.innerHTML = '';
+            if (items.length === 0) { log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhum item a €0,00.</p>'; return; }
+            
+            items.slice(0, 15).forEach(item => { 
+                log.innerHTML += `
+                <div class="mb-2 border-b border-cyan-200 pb-1 last:border-0">
+                    <div class="flex justify-between items-center">
+                        <strong class="text-cyan-800 text-xs truncate max-w-[80%]" title="${item.name}">${item.name}</strong>
+                    </div>
+                    <div class="text-[10px] text-cyan-600 flex justify-between mt-0.5">
+                        <span class="truncate max-w-[60%]">${item.buyer.split('-')[1]?.trim() || item.buyer}</span>
+                        <span>${item.dateObj ? item.dateObj.toLocaleDateString('pt-PT').slice(0,5) : '-'}</span>
+                    </div>
+                </div>`; 
+            });
+        }
+
         function runAudit(data, activeStores) {
             const tbody = document.getElementById('table-body'); tbody.innerHTML = '';
             processedErrors = []; storeDetailsMap = {}; evolutionDataStore = { daily: {}, weekly: {}, monthly: {} };
-            let allItemsFlat = [], totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
+            
+            let allItemsFlat = [], zeroCostItems = [];
+            let totalErrCount = 0, totalErrVal = 0, globalTotalVal = 0;
             let trendData = {}, storeTotalWaste = {}, productTotalWaste = {}, errorRows = [], allValidDates = [];
 
             const startInput = document.getElementById('filter-start-date').value;
@@ -659,6 +692,11 @@
                 const itemObj = { dateObj: date, dateStr: localIso, name, val, type, desc, buyer, dayKey: localIso, weekLabel: date ? getWeekLabel(date).label : null, monthLabel: date ? date.toLocaleString('pt-PT', { month: 'short', year: '2-digit' }) : null };
                 if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
                 storeDetailsMap[buyer].push(itemObj); allItemsFlat.push(itemObj);
+
+                // Check for 0 cost items
+                if (val === 0 && name) {
+                    zeroCostItems.push(itemObj);
+                }
 
                 let errs = [];
                 validationRules.forEach(rule => { if (rule.check(itemObj)) errs.push(rule.message(itemObj)); });
@@ -705,6 +743,7 @@
             }
             
             renderAnomalies(calculateAnomalies(allItemsFlat, rawData)); 
+            renderZeroCost(zeroCostItems);
             updateMainCharts(productTotalWaste, trendData, storeTotalWaste); 
             renderEvolutionChart(currentEvolutionMode);
         }
@@ -759,16 +798,13 @@
             });
         }
 
-        // --- PATCH: NOVO MODAL PARA O GRÁFICO DE PRODUTOS ---
         function openProductStoreRankingModal(productName) {
             let filteredItems = [];
-            // Procura todos os itens deste produto específico em todas as lojas ativas no ecrã
             const activeStores = Array.from(document.querySelectorAll('.store-cb:checked')).map(cb => cb.value);
             activeStores.forEach(store => {
                 if (storeDetailsMap[store]) {
                     storeDetailsMap[store].forEach(item => {
                         if (item.name === productName) {
-                            // Mapeia o 'name' do item para o nome da loja, para o modal genérico agregar pelas lojas!
                             filteredItems.push({ ...item, originalName: item.name, name: store });
                         }
                     });
@@ -785,7 +821,6 @@
                 data: { labels: sortedProducts.map(x=>x[0]), datasets: [{ label: 'Total (€)', data: sortedProducts.map(x=>x[1]), backgroundColor: '#f59e0b', borderRadius: 4 }] }, 
                 options: { 
                     indexAxis: 'y', responsive: true, maintainAspectRatio: false, plugins: { legend: {display:false} },
-                    // PATCH: Gatilho de Clique no Gráfico de Produtos
                     onClick: (evt, activeElements) => { if (activeElements.length > 0) openProductStoreRankingModal(sortedProducts[activeElements[0].index][0]); }, 
                     onHover: (e, el) => e.native.target.style.cursor = el[0] ? 'pointer' : 'default'
                 } 
@@ -812,11 +847,9 @@
         function openPeriodModal(periodKey, mode) { let filteredItems = []; const allStoreKeys = Object.keys(storeDetailsMap); allStoreKeys.forEach(store => { storeDetailsMap[store].forEach(item => { let match = false; if (mode === 'daily') match = (item.dayKey === periodKey); else if (mode === 'weekly') match = (item.weekLabel === periodKey); else if (mode === 'monthly') match = (item.monthLabel === periodKey); if (match) filteredItems.push(item); }); }); openGenericModal(periodKey, "Produtos com maior impacto neste período", filteredItems); }
 
         function showModalDrillDown(clickedName, contextItems) {
-            // PATCH: Diferencia se o utilizador está a clicar num Produto ou numa Loja (vinda do novo Ranking de Lojas por Produto)
             const isStoreRanking = currentModalContext.subtitle.includes("Ranking de Lojas por Gasto no Produto");
             const actualProductName = isStoreRanking ? currentModalContext.title : clickedName;
             
-            // O título fica mais amigável: "ARROZ SUSHI_RFU (Almada)"
             document.getElementById('modal-title').innerText = isStoreRanking ? `${actualProductName} (${clickedName.split('-')[1]?.trim() || clickedName})` : clickedName; 
             document.getElementById('modal-subtitle').innerText = "Evolução diária (Vermelho = Acima da Meta)"; 
             document.getElementById('btn-back-level').classList.remove('hidden');
