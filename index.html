@@ -205,7 +205,7 @@
                         </div>
                     </div>
 
-                    <!-- Custo Zero (NOVO) -->
+                    <!-- Custo Zero -->
                     <div class="bg-white p-5 rounded-xl shadow-sm border-l-4 border-cyan-500 flex flex-col">
                         <div class="flex justify-between items-center mb-2">
                             <p class="text-xs text-cyan-600 uppercase font-bold flex items-center"><i class="fas fa-search-dollar mr-1"></i> Custo Zero (€0,00)</p>
@@ -347,6 +347,11 @@
                 id: "CPK_IN_NAME", 
                 check: (item) => item.name.toUpperCase().includes("CPK"), 
                 message: () => "Nome contém 'CPK'" 
+            },
+            { 
+                id: "PAS_IN_NAME", 
+                check: (item) => item.name.toUpperCase().includes("PAS"), 
+                message: () => "Nome contém 'PAS'" 
             },
             { 
                 id: "INVALID_TYPE", 
@@ -601,14 +606,21 @@
                 const name = String(r['Item name']||"").trim();
                 if(name) globalCounts[name] = (globalCounts[name] || 0) + 1;
             });
+
             const anomalies = [];
-            itemsList.forEach(item => { if (globalCounts[item.name] === 1) anomalies.push(item); });
+            itemsList.forEach(item => {
+                if (globalCounts[item.name] === 1) {
+                    anomalies.push(item);
+                }
+            });
+            
             return anomalies.sort((a,b) => b.val - a.val);
         }
 
         function renderAnomalies(anomalies) {
             const log = document.getElementById('anomalies-log'); log.innerHTML = '';
             if (anomalies.length === 0) { log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhum item único (typo).</p>'; return; }
+            
             anomalies.slice(0, 10).forEach(anom => { 
                 log.innerHTML += `
                 <div class="mb-2 border-b border-purple-200 pb-1 last:border-0">
@@ -624,7 +636,6 @@
             });
         }
 
-        // --- NOVO: RENDERIZAR CUSTOS ZERO ---
         function renderZeroCost(items) {
             const log = document.getElementById('zero-cost-log'); log.innerHTML = '';
             if (items.length === 0) { log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhum item a €0,00.</p>'; return; }
@@ -693,7 +704,6 @@
                 if (!storeDetailsMap[buyer]) storeDetailsMap[buyer] = [];
                 storeDetailsMap[buyer].push(itemObj); allItemsFlat.push(itemObj);
 
-                // Check for 0 cost items
                 if (val === 0 && name) {
                     zeroCostItems.push(itemObj);
                 }
