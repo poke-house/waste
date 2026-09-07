@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Desperdícios - Plataforma Final</title>
+    <title>Dashboard Desperdícios - Plataforma Final (V37 - Sem Senha)</title>
     
     <!-- Favicon Nativo em SVG (Balde) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪣</text></svg>">
@@ -26,39 +26,15 @@
         body.modal-active { overflow-x: hidden; overflow-y: hidden !important; }
         .switch-btn.active { background-color: white; color: #4f46e5; box-shadow: 0 1px 3px rgba(0,0,0,0.1); font-weight: 600; }
         .switch-btn { color: #64748b; font-weight: 500; }
-        
-        /* Ocultar as setas do input number do PIN */
-        input[type=number]::-webkit-inner-spin-button, 
-        input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
-        input[type=password] { letter-spacing: 0.5em; text-align: center; }
     </style>
 </head>
 <body class="p-4 md:p-8 text-slate-800">
 
-    <!-- TELA DE BLOQUEIO (PIN) -->
-    <div id="lock-screen" class="fixed inset-0 bg-slate-900 z-[200] flex flex-col items-center justify-center transition-opacity duration-500">
-        <div class="bg-white p-8 rounded-2xl shadow-2xl w-full max-w-sm text-center transform transition-transform duration-500">
-            <div class="bg-indigo-100 w-16 h-16 mx-auto rounded-full flex items-center justify-center mb-4">
-                <i class="fas fa-lock text-2xl text-indigo-600"></i>
-            </div>
-            <h2 class="text-2xl font-bold text-slate-800 mb-1">Acesso Restrito</h2>
-            <p class="text-sm text-slate-500 mb-6">Insira o PIN numérico para aceder ao painel.</p>
-            
-            <input type="password" id="pin-input" maxlength="4" placeholder="••••" autocomplete="off"
-                   class="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-center text-3xl focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/20 outline-none mb-4 transition-all">
-            
-            <button onclick="unlockDashboard()" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-indigo-200 flex items-center justify-center">
-                Desbloquear <i class="fas fa-arrow-right ml-2"></i>
-            </button>
-            <p id="pin-error" class="text-red-500 text-sm font-bold mt-4 opacity-0 transition-opacity">PIN Incorreto. Tente novamente.</p>
-        </div>
-    </div>
-
     <!-- TOAST NOTIFICATIONS CONTAINER -->
     <div id="toast-container" class="fixed bottom-5 right-5 z-[100] flex flex-col gap-3"></div>
 
-    <!-- WRAPPER PRINCIPAL DO DASHBOARD (Inicia Escondido) -->
-    <div id="main-dashboard" class="hidden opacity-0 transition-opacity duration-1000">
+    <!-- WRAPPER PRINCIPAL DO DASHBOARD (Agora visível por defeito) -->
+    <div id="main-dashboard" class="transition-opacity duration-1000">
 
         <!-- MODAL GRÁFICO (Genérico) -->
         <div id="details-modal" class="modal opacity-0 pointer-events-none fixed w-full h-full top-0 left-0 flex items-center justify-center z-50">
@@ -294,39 +270,12 @@
     </div> <!-- END MAIN DASHBOARD -->
 
     <script>
-        // --- 0. LÓGICA DA TELA DE BLOQUEIO (PIN) ---
+        // --- 0. LÓGICA DE CARREGAMENTO INICIAL ---
         window.onload = () => { 
             if(typeof XLSX === 'undefined') {
-                document.getElementById('lock-screen').innerHTML = '<div class="bg-white p-8 rounded text-center"><h2 class="text-red-500 font-bold text-xl mb-2">Erro de Conexão</h2><p>Não foi possível carregar as bibliotecas. Verifique a sua internet.</p></div>';
-            } else {
-                document.getElementById('pin-input').focus(); 
+                document.body.innerHTML = '<div class="bg-white p-8 rounded text-center"><h2 class="text-red-500 font-bold text-xl mb-2">Erro de Conexão</h2><p>Não foi possível carregar as bibliotecas. Verifique a sua internet.</p></div>';
             }
         };
-
-        const pinInput = document.getElementById('pin-input');
-        pinInput.addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') unlockDashboard();
-        });
-
-        function unlockDashboard() {
-            if (pinInput.value === "5838") {
-                const lock = document.getElementById('lock-screen');
-                lock.classList.add('opacity-0');
-                setTimeout(() => {
-                    lock.classList.add('hidden');
-                    const main = document.getElementById('main-dashboard');
-                    main.classList.remove('hidden');
-                    setTimeout(() => main.classList.remove('opacity-0'), 50);
-                    showToast("Acesso autorizado.", "success");
-                }, 500); 
-            } else {
-                const err = document.getElementById('pin-error');
-                err.classList.remove('opacity-0');
-                pinInput.value = "";
-                pinInput.focus();
-                setTimeout(() => err.classList.add('opacity-0'), 3000);
-            }
-        }
 
         // --- SISTEMA DE TOASTS ---
         function showToast(message, type = 'success') {
@@ -406,16 +355,14 @@
                 } 
             },
             {
-                id: "RAW_MATERIAL_NOT_EOD",
+                id: "END_OF_DAY_REQUIRES_RFU",
                 check: (item) => {
-                    const t = item.type.toLowerCase();
                     const d = item.desc.toLowerCase();
-                    if (t === "purchase" || t === "inventory item") {
-                        if (d === "end of day") return true;
-                    }
+                    const hasRFU = item.name.toUpperCase().includes("RFU");
+                    if (d === "end of day" && !hasRFU) return true;
                     return false;
                 },
-                message: () => "Itens 'Purchase' ou 'Inventory item' NUNCA podem ser 'End of day' (Use Expired, Spoiled, Dropped, etc.)"
+                message: () => "Apenas itens preparados (com 'RFU') podem ser 'End of day'. Itens sem RFU devem ser Expired/Spoiled/Dropped."
             }
         ];
 
@@ -606,21 +553,14 @@
                 const name = String(r['Item name']||"").trim();
                 if(name) globalCounts[name] = (globalCounts[name] || 0) + 1;
             });
-
             const anomalies = [];
-            itemsList.forEach(item => {
-                if (globalCounts[item.name] === 1) {
-                    anomalies.push(item);
-                }
-            });
-            
+            itemsList.forEach(item => { if (globalCounts[item.name] === 1) anomalies.push(item); });
             return anomalies.sort((a,b) => b.val - a.val);
         }
 
         function renderAnomalies(anomalies) {
             const log = document.getElementById('anomalies-log'); log.innerHTML = '';
             if (anomalies.length === 0) { log.innerHTML = '<p class="text-center text-green-600 font-bold mt-2"><i class="fas fa-check"></i> Nenhum item único (typo).</p>'; return; }
-            
             anomalies.slice(0, 10).forEach(anom => { 
                 log.innerHTML += `
                 <div class="mb-2 border-b border-purple-200 pb-1 last:border-0">
